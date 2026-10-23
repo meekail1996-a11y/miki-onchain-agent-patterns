@@ -29,7 +29,6 @@ cd miki-onchain-agent-patterns
 forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
 forge test
 Project Structure
-text
 
 ├── contracts/          # Solidity implementations
 │   └── Pattern1_PlannerExecutor.sol
