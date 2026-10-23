@@ -1,59 +1,60 @@
-# On-chain Agent Patterns
+# On-chain Agent Patterns – Deep Dive
 
-Reference implementations for AI agents that interact with smart contracts.
+## 1. Planner / Executor
 
-## Why this repo exists
+**Status:** Implemented
 
-Most "AI agents" on-chain are just LLM wrappers with a wallet attached. They work in demos. They break in production.
+### How it works
+- An off-chain AI (Planner) decides what action to take
+- It creates and signs an `Intent` (EIP-712)
+- Anyone can submit the signed Intent to the contract
+- The contract verifies the signature, nonce, and deadline, then executes the call
 
-The real engineering challenge is the gap between **deciding** and **executing**.
+### Key Properties
+- High trust (only the designated signer can authorize actions)
+- Low latency
+- Simple and auditable
 
-This repository documents practical patterns for bridging that gap — with working code.
+### Best for
+- Retail DeFi actions
+- Controlled agent operations
+- Situations where you want strong guarantees
 
-## Patterns at a glance
+### Limitations
+- The agent cannot act without creating a new signed Intent
+- Not suitable for high-frequency or fully autonomous strategies
 
-| Pattern | Trust | Latency | Use Case | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| 1. Planner / Executor | High | Low | Retail DeFi, simple actions | ✅ Implemented |
-| 2. Bounded Autonomy | Medium | Medium | Automated strategies | 🚧 Planned |
-| 3. Multi-agent + Arbitration | Highest | High | Institutional / high-value | 🚧 Planned |
+---
 
-📖 **[Full pattern breakdown](docs/patterns.md)**  
-🔒 **[Security checklist](docs/security.md)**
+## 2. Bounded Autonomy
 
-## Quick Start (Pattern 1)
+**Status:** Planned
 
-```bash
-git clone https://github.com/meekail1996-a11y/miki-onchain-agent-patterns
-cd miki-onchain-agent-patterns
-forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
-forge test
-Project Structure
+### Concept
+The agent receives limited permission to act freely within predefined boundaries (spending limits, allowed targets, time windows, etc.).
 
-├── contracts/          # Solidity implementations
-│   └── Pattern1_PlannerExecutor.sol
-├── scripts/            # Off-chain signing scripts (Python)
-│   └── sign_intent.py
-├── test/               # Foundry tests
-└── docs/
-    ├── patterns.md     # Deep dive into each pattern
-    └── security.md     # Security checklist
+Instead of signing every single action, the agent operates inside a sandbox enforced by the smart contract.
 
-Pattern 1: Planner / Executor (Current)
+### Expected Benefits
+- Better autonomy
+- Still maintains meaningful constraints
+- Good balance between flexibility and safety
 
-    The AI (Planner) creates a signed Intent
+---
 
-    The smart contract (Executor) verifies the signature and executes it
+## 3. Multi-agent + Arbitration
 
-    Built-in protections: nonce + deadline
+**Status:** Planned
 
-This is the safest and simplest pattern for most use cases.
+### Concept
+Multiple agents can propose actions.  
+A consensus or arbitration mechanism (voting, multisig, dispute window, etc.) decides what gets executed.
 
-Contributing
-This is being built in public. Feedback, issues, and PRs are very welcome — especially for Pattern 2 and 3.
+### Best for
+- High-value decisions
+- Institutional use cases
+- Situations requiring higher security and checks
 
-License
-MIT
+---
 
-
-
+More details and implementations will be added as the patterns are built.
