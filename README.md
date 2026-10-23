@@ -28,6 +28,36 @@ cd miki-onchain-agent-patterns
 forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
 forge test
 
+
+## Python Intent Signer
+
+Install the Python dependencies:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Set configuration in your current PowerShell session (replace the example addresses with addresses from your own local/test deployment):
+
+```powershell
+$env:PRIVATE_KEY = "YOUR_TEST_WALLET_PRIVATE_KEY"
+$env:CHAIN_ID = "31337"
+$env:CONTRACT_ADDRESS = "YOUR_DEPLOYED_EXECUTOR_ADDRESS"
+$env:TARGET_ADDRESS = "YOUR_INTENDED_TARGET_ADDRESS"
+$env:INTENT_NONCE = "0"
+python scripts/sign_intent.py
+```
+
+Use a dedicated test-only key with no real funds. Never commit a private key or paste it into chat/issues. The nonce must match the executor's current on-chain `nonce()` value; update it after each successful execution. Mainnet signing is blocked unless `ALLOW_MAINNET_SIGNING=1` is explicitly set.
+
+Run the Python validation tests:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+GitHub Actions runs the Python validation tests and Foundry tests on pushes to `main` and pull requests.
+
 ## Project Structure
 
 contracts/          # Solidity implementations
