@@ -18,42 +18,39 @@ This repository documents practical patterns for bridging that gap — with work
 | 2. Bounded Autonomy | Medium | Medium | Automated strategies | 🚧 Planned |
 | 3. Multi-agent + Arbitration | Highest | High | Institutional / high-value | 🚧 Planned |
 
-📖 **[Full pattern breakdown](docs/patterns.md)**  
+📖 **[Full pattern breakdown](docs/patterns.md)**
 🔒 **[Security checklist](docs/security.md)**
 
 ## Quick Start (Pattern 1)
 
-```bash
 git clone https://github.com/meekail1996-a11y/miki-onchain-agent-patterns
 cd miki-onchain-agent-patterns
 forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
 forge test
-Project Structure
 
-├── contracts/          # Solidity implementations
-│   └── Pattern1_PlannerExecutor.sol
-├── scripts/            # Off-chain signing scripts (Python)
-│   └── sign_intent.py
-├── test/               # Foundry tests
-└── docs/
-    ├── patterns.md     # Deep dive into each pattern
-    └── security.md     # Security checklist
+## Project Structure
 
-Pattern 1: Planner / Executor (Current)
+contracts/          # Solidity implementations
+  Pattern1_PlannerExecutor.sol
+scripts/            # Off-chain signing scripts (Python)
+  sign_intent.py
+test/               # Foundry tests
+docs/
+  patterns.md       # Deep dive into each pattern
+  security.md       # Security checklist
 
-    The AI (Planner) creates a signed Intent
+## Pattern 1: Planner / Executor (Current)
 
-    The smart contract (Executor) verifies the signature and executes it
-
-    Built-in protections: nonce + deadline
+- The AI (Planner) creates a signed Intent
+- The smart contract (Executor) verifies the signature and executes it
+- Built-in protections: nonce + deadline
 
 This is the safest and simplest pattern for most use cases.
 
-Contributing
+## Contributing
+
 This is being built in public. Feedback, issues, and PRs are very welcome — especially for Pattern 2 and 3.
 
-License
+## License
+
 MIT
-
-
-
