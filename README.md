@@ -25,7 +25,7 @@ This repository documents practical patterns for bridging that gap — with work
 
 git clone https://github.com/meekail1996-a11y/miki-onchain-agent-patterns
 cd miki-onchain-agent-patterns
-forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
+forge install foundry-rs/forge-std@v1.9.6 OpenZeppelin/openzeppelin-contracts@v5.0.2
 forge test
 
 
