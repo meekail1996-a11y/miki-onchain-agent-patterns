@@ -11,7 +11,7 @@ Required environment variables:
 Optional:
   INTENT_VALUE      Native currency value in wei (default: 0)
   INTENT_DATA       Hex calldata, e.g. 0x (default: 0x)
-  INTENT_NONCE      Executor nonce (default: 0; set to the current on-chain nonce)
+  INTENT_NONCE      Current on-chain executor nonce (required; never guess this value)
   INTENT_TTL        Intent lifetime in seconds (default: 300)
   ALLOW_MAINNET_SIGNING Set to 1 to explicitly permit signing for chain ID 1
 
@@ -30,6 +30,7 @@ from eth_utils import is_address, to_checksum_address
 DOMAIN_NAME = "Pattern1_PlannerExecutor"
 DOMAIN_VERSION = "1"
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+MAX_UINT256 = (1 << 256) - 1
 
 TYPES = {
     "Intent": [
@@ -64,6 +65,8 @@ def positive_int_env(name, default=None, allow_zero=False):
     minimum = 0 if allow_zero else 1
     if value < minimum:
         raise ValueError(f"{name} must be {'zero or greater' if allow_zero else 'greater than zero'}")
+    if value > MAX_UINT256:
+        raise ValueError(f"{name} must fit in uint256")
     return value
 
 
@@ -77,6 +80,9 @@ def checked_address(name, value):
 
 
 def build_intent(target, value, data, nonce, ttl_seconds=300):
+    for name, number in (("INTENT_VALUE", value), ("INTENT_NONCE", nonce)):
+        if not isinstance(number, int) or number < 0 or number > MAX_UINT256:
+            raise ValueError(f"{name} must be an integer between 0 and 2**256 - 1")
     if not isinstance(data, str) or not data.startswith("0x"):
         raise ValueError("INTENT_DATA must be hex data beginning with 0x")
     try:
@@ -86,12 +92,16 @@ def build_intent(target, value, data, nonce, ttl_seconds=300):
     if ttl_seconds <= 0:
         raise ValueError("INTENT_TTL must be greater than zero")
 
+    deadline = int(time.time()) + ttl_seconds
+    if deadline > MAX_UINT256:
+        raise ValueError("INTENT_TTL produces a deadline outside uint256 range")
+
     return {
         "target": target,
         "value": value,
         "data": data,
         "nonce": nonce,
-        "deadline": int(time.time()) + ttl_seconds,
+        "deadline": deadline,
     }
 
 
@@ -131,7 +141,7 @@ def main():
         target=target_address,
         value=positive_int_env("INTENT_VALUE", default=0, allow_zero=True),
         data=os.getenv("INTENT_DATA", "0x").strip(),
-        nonce=positive_int_env("INTENT_NONCE", default=0, allow_zero=True),
+        nonce=positive_int_env("INTENT_NONCE", allow_zero=True),
         ttl_seconds=positive_int_env("INTENT_TTL", default=300),
     )
 
