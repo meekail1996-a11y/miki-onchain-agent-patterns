@@ -22,5 +22,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: foundry-rs/foundry-toolchain@v1
-      - run: forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
+      - run: forge install foundry-rs/forge-std@v1.9.6 OpenZeppelin/openzeppelin-contracts@v5.0.2
       - run: forge test
