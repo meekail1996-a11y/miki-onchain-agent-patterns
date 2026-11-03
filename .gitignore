@@ -4,6 +4,11 @@ lib/
 broadcast/
 __pycache__/
 *.pyc
+
+# Local secrets and environment files
 .env
+.env.*
+!.env.example
+
 venv/
 .DS_Store
