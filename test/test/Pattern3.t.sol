@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-// استفاده از مسیر مطلق برای جلوگیری از خطای مسیر
 import "contracts/Pattern3_MultiAgentArbitration.sol";
 
 contract Pattern3Test is Test {
@@ -12,6 +11,7 @@ contract Pattern3Test is Test {
     uint256 signerPrivateKey;
     address agent1;
     address agent2;
+    address agent3;
     address allowedTarget;
 
     function setUp() public {
@@ -19,11 +19,11 @@ contract Pattern3Test is Test {
         (signer, signerPrivateKey) = makeAddrAndKey("signer");
         agent1 = makeAddr("agent1");
         agent2 = makeAddr("agent2");
+        agent3 = makeAddr("agent3");
         allowedTarget = address(new MockTarget());
 
         multiAgent = new Pattern3_MultiAgentArbitration(signer, arbiter);
 
-        // افزودن ایجنت‌ها
         multiAgent.addAgent(agent1);
         multiAgent.addAgent(agent2);
     }
@@ -92,7 +92,6 @@ contract Pattern3Test is Test {
         vm.prank(agent2);
         multiAgent.vote(proposalId, true);
 
-        // بررسی آرا (حذف یک کامای اضافی)
         (,,, uint256 approvals,,) = multiAgent.proposals(proposalId);
         assertEq(approvals, 2);
     }
@@ -100,10 +99,8 @@ contract Pattern3Test is Test {
     function test_ArbitrationExecutesProposal() public {
         uint256 proposalId = _createProposal();
 
-        // داور تصمیم می‌گیرد پیشنهاد اجرا شود
         multiAgent.resolveArbitration(proposalId, true);
 
-        // بررسی اجرا (حذف یک کامای اضافی)
         (,,,,, bool executed) = multiAgent.proposals(proposalId);
         assertTrue(executed);
     }
@@ -114,6 +111,37 @@ contract Pattern3Test is Test {
         vm.prank(agent1);
         vm.expectRevert(Pattern3_MultiAgentArbitration.NotArbiter.selector);
         multiAgent.resolveArbitration(proposalId, true);
+    }
+
+    // --- تست‌های جدید امنیتی ---
+
+    function test_RevertWhenVotingTwice() public {
+        uint256 proposalId = _createProposal();
+
+        vm.prank(agent1);
+        multiAgent.vote(proposalId, true);
+
+        vm.prank(agent1);
+        vm.expectRevert(Pattern3_MultiAgentArbitration.AlreadyVoted.selector);
+        multiAgent.vote(proposalId, true);
+    }
+
+    function test_RevertWhenVotingAfterExecution() public {
+        uint256 proposalId = _createProposal();
+
+        multiAgent.resolveArbitration(proposalId, true);
+
+        vm.prank(agent1);
+        vm.expectRevert(Pattern3_MultiAgentArbitration.ProposalAlreadyExecuted.selector);
+        multiAgent.vote(proposalId, true);
+    }
+
+    function test_RevertWhenUnauthorizedAgentVotes() public {
+        uint256 proposalId = _createProposal();
+
+        vm.prank(agent3);
+        vm.expectRevert(Pattern3_MultiAgentArbitration.NotAgent.selector);
+        multiAgent.vote(proposalId, true);
     }
 }
 
