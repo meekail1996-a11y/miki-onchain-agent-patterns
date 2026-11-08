@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "./Pattern1_PlannerExecutor.sol";
 
 contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
-    // تنظیمات امنیتی
     uint256 public spendingCapPerDay;
     uint256 public spentToday;
     uint256 public lastResetDay;
@@ -14,14 +13,12 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
     
     address public admin;
 
-    // رویدادها
     event TargetAllowlisted(address indexed target);
     event TargetRemoved(address indexed target);
     event SpendingCapUpdated(uint256 newCap);
     event EmergencyStopped();
     event EmergencyResumed();
 
-    // خطاها
     error NotAdmin();
     error TargetNotAllowed();
     error SpendingCapExceeded();
@@ -48,7 +45,6 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
         _;
     }
 
-    // مدیریت لیست سفید
     function addTarget(address _target) external onlyAdmin {
         allowlistedTargets[_target] = true;
         emit TargetAllowlisted(_target);
@@ -59,13 +55,11 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
         emit TargetRemoved(_target);
     }
 
-    // مدیریت سقف هزینه
     function setSpendingCap(uint256 _newCap) external onlyAdmin {
         spendingCapPerDay = _newCap;
         emit SpendingCapUpdated(_newCap);
     }
 
-    // توقف اضطراری
     function emergencyStop() external onlyAdmin {
         emergencyStopped = true;
         emit EmergencyStopped();
@@ -76,15 +70,13 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
         emit EmergencyResumed();
     }
 
-    // بازنویسی execute برای اعمال محدودیت‌ها
+    // تغییر: calldata به memory
     function execute(
-        Intent calldata intent,
-        bytes calldata signature
+        Intent memory intent,
+        bytes memory signature
     ) public override notStopped {
-        // بررسی لیست سفید
         if (!allowlistedTargets[intent.target]) revert TargetNotAllowed();
 
-        // بررسی سقف هزینه روزانه
         uint256 currentDay = block.timestamp / 1 days;
         if (currentDay > lastResetDay) {
             spentToday = 0;
@@ -95,10 +87,8 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
             revert SpendingCapExceeded();
         }
 
-        // فراخوانی تابع اصلی (Pattern 1)
         super.execute(intent, signature);
 
-        // به‌روزرسانی هزینه
         spentToday += intent.value;
     }
 }

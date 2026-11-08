@@ -35,7 +35,8 @@ contract Pattern1_PlannerExecutor is EIP712 {
         agentSigner = _agentSigner;
     }
 
-    function execute(Intent calldata intent, bytes calldata signature) public virtual {
+    // تغییر: calldata به memory
+    function execute(Intent memory intent, bytes memory signature) public virtual {
         if (block.timestamp > intent.deadline) revert IntentExpired();
         if (intent.nonce != nonce) revert InvalidNonce();
 
@@ -55,7 +56,7 @@ contract Pattern1_PlannerExecutor is EIP712 {
 
         nonce++;
 
-        // رویداد قبل از call خارجی emit می‌شود تا از دستکاری در Reentrancy جلوگیری شود
+        // رویداد قبل از call خارجی emit می‌شود
         emit IntentExecuted(intent.target, intent.value, intent.nonce);
 
         (bool ok, ) = intent.target.call{value: intent.value}(intent.data);
