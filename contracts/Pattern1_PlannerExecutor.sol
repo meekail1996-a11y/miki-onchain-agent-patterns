@@ -33,7 +33,7 @@ contract Pattern1_PlannerExecutor is EIP712 {
         agentSigner = _agentSigner;
     }
 
-    function execute(Intent calldata intent, bytes calldata signature) external {
+    function execute(Intent calldata intent, bytes calldata signature) public virtual {
         if (block.timestamp > intent.deadline) revert IntentExpired();
         if (intent.nonce != nonce) revert InvalidNonce();
 
