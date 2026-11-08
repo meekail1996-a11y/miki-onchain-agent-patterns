@@ -28,8 +28,10 @@ contract Pattern1_PlannerExecutor is EIP712 {
     error InvalidNonce();
     error InvalidSignature();
     error CallFailed();
+    error InvalidAgentSigner();
 
     constructor(address _agentSigner) EIP712("Pattern1_PlannerExecutor", "1") {
+        if (_agentSigner == address(0)) revert InvalidAgentSigner();
         agentSigner = _agentSigner;
     }
 
@@ -53,10 +55,11 @@ contract Pattern1_PlannerExecutor is EIP712 {
 
         nonce++;
 
+        // رویداد قبل از call خارجی emit می‌شود تا از دستکاری در Reentrancy جلوگیری شود
+        emit IntentExecuted(intent.target, intent.value, intent.nonce);
+
         (bool ok, ) = intent.target.call{value: intent.value}(intent.data);
         if (!ok) revert CallFailed();
-
-        emit IntentExecuted(intent.target, intent.value, intent.nonce);
     }
 
     receive() external payable {}

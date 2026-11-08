@@ -31,6 +31,8 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
         address _agentSigner,
         uint256 _initialSpendingCapPerDay
     ) Pattern1_PlannerExecutor(_agentSigner) {
+        if (msg.sender == address(0)) revert InvalidAgentSigner();
+        if (_agentSigner == address(0)) revert InvalidAgentSigner();
         admin = msg.sender;
         spendingCapPerDay = _initialSpendingCapPerDay;
         lastResetDay = block.timestamp / 1 days;
