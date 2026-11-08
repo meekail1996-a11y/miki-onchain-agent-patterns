@@ -7,10 +7,10 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
     uint256 public spendingCapPerDay;
     uint256 public spentToday;
     uint256 public lastResetDay;
-    
+
     mapping(address => bool) public allowlistedTargets;
     bool public emergencyStopped;
-    
+
     address public admin;
 
     event TargetAllowlisted(address indexed target);
@@ -71,24 +71,29 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
     }
 
     // تغییر: calldata به memory
-    function execute(
-        Intent memory intent,
-        bytes memory signature
-    ) public override notStopped {
-        if (!allowlistedTargets[intent.target]) revert TargetNotAllowed();
 
-        uint256 currentDay = block.timestamp / 1 days;
-        if (currentDay > lastResetDay) {
-            spentToday = 0;
-            lastResetDay = currentDay;
-        }
+function execute(
+    Intent memory intent,
+    bytes memory signature
+) public override notStopped {
+    if (!allowlistedTargets[intent.target]) revert TargetNotAllowed();
 
-        if (spentToday + intent.value > spendingCapPerDay) {
-            revert SpendingCapExceeded();
-        }
+    uint256 currentDay = block.timestamp / 1 days;
 
-        super.execute(intent, signature);
-
-        spentToday += intent.value;
+    if (currentDay > lastResetDay) {
+        spentToday = 0;
+        lastResetDay = currentDay;
     }
+
+    if (spentToday + intent.value > spendingCapPerDay) {
+        revert SpendingCapExceeded();
+    }
+
+    // ثبت هزینه قبل از فراخوانی خارجی
+    spentToday += intent.value;
+
+    // اجرای Intent پس از ثبت هزینه
+    super.execute(intent, signature);
+}
+
 }
