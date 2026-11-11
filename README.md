@@ -2,9 +2,11 @@
 
 **A learning-oriented reference project for constrained AI-agent interactions with smart contracts.**
 
-This repository demonstrates an important security boundary: an AI system may propose an action, but it should not receive unrestricted authority to execute it. The Planner reasons off-chain; the on-chain Executor validates an explicitly signed `Intent` before making an external call.
+This repository explores how to separate off-chain AI decision-making from on-chain execution authority.
 
-> **Core principle:** The Planner proposes. The Executor enforces. Signing authority stays separate from open-ended model output.
+An AI agent may propose an action, but it should not receive unrestricted permission to execute arbitrary transactions. Instead, a dedicated signer authorizes a structured `Intent`, and an on-chain Executor validates that authorization before making an external call.
+
+> **Core principle:** The Planner proposes. The Executor enforces.
 
 [Architecture](#architecture) · [Patterns](#patterns) · [Security Model](#security-model) · [Quick Start](#quick-start) · [Testing](#testing) · [Roadmap](#roadmap)
 
@@ -12,176 +14,209 @@ This repository demonstrates an important security boundary: an AI system may pr
 
 ## Why this project exists
 
-Connecting an LLM directly to a wallet creates a dangerous coupling between reasoning and financial authority. A model can misunderstand a request, produce unexpected calldata, or be manipulated by untrusted input.
+Connecting an AI agent directly to a wallet can create dangerous security assumptions.
 
-This project explores a more constrained design:
+An agent may misunderstand a request, generate unexpected calldata, or be influenced by malicious input. Even when its reasoning appears correct, its proposed action should not automatically become an authorized blockchain transaction.
 
-1. The Planner creates a structured action proposal.
-2. A dedicated signer authorizes the exact `Intent`.
-3. The Executor checks the typed signature, nonce, and deadline.
-4. The Executor makes the requested external call.
+This project demonstrates a more constrained workflow:
 
-The repository is an evolving educational reference. It has **not** been presented as a security audit or production-ready financial infrastructure.
+1. **Planner:** prepares a structured action off-chain.
+2. **Signer:** authorizes the exact `Intent` using a dedicated signing key.
+3. **Executor:** verifies the signature and enforces on-chain rules.
+4. **Target:** receives the authorized external call.
 
----
+The goal is not to prove that an AI agent always makes safe decisions. The goal is to demonstrate how smart contracts can enforce explicit execution constraints independently of the agent's reasoning.
 
 ## Architecture
 
 ```text
 User / Application
-       |
-       v
-Planner (AI / off-chain logic)
-       |
-       | structured Intent
-       v
-Policy / Review (optional off-chain layer)
-       |
-       v
-Dedicated Signer
-       |
-       | EIP-712 signature
-       v
-On-chain Executor
-       |
-       | validated external call
-       v
-Target contract / protocol
+        |
+        v
+     Planner
+  (AI / Off-chain logic)
+        |
+        v
+  Optional Policy /
+   Review Layer
+        |
+        v
+     Signer
+ (Intent authorization)
+        |
+        v
+  On-chain Executor
+        |
+        v
+   Target Contract
 ```
 
-The optional policy/review layer may add simulation, target checks, spending policies, monitoring, or human approval. Those controls must not be assumed to exist on-chain unless the relevant contract actually implements them.
-
----
+The optional policy or review layer is an architectural possibility, not a claim that every pattern in this repository implements such a layer.
 
 ## Patterns
 
-### Pattern 1: Planner / Executor
+### Pattern 1 — Planner / Executor
 
-**Code:** `contracts/Pattern1_PlannerExecutor.sol`
+**Contract:** `contracts/Pattern1_PlannerExecutor.sol`
 
-The base contract accepts an EIP-712 signed `Intent` containing:
+Demonstrates a signed `Intent` execution model using EIP-712 typed-data signatures.
 
-| Field | Meaning |
-|---|---|
-| `target` | Contract address to call |
-| `value` | Native currency value, in wei |
-| `data` | Calldata for the target call |
-| `nonce` | Sequential Executor nonce used for replay protection |
-| `deadline` | Unix timestamp after which the Intent expires |
+An Intent contains:
 
-The contract checks the deadline, expected nonce, and recovered signer. It increments the nonce before making the external call.
+- `target`: destination contract.
+- `value`: native currency amount in wei.
+- `data`: encoded call data.
+- `nonce`: replay-protection value.
+- `deadline`: expiration timestamp.
 
-**Current scope:** signature validation, nonce checking, deadline checking, and an external call.
+The Executor validates the signature, checks the expected nonce and deadline, and executes the authorized call.
 
-**Important limitation:** Pattern 1 does not itself provide a target allowlist, spending cap, emergency pause, transaction simulation, or human approval.
+**Security properties demonstrated:**
 
-### Pattern 2: Bounded Autonomy
+- Typed-data signature verification.
+- Signer authorization.
+- Nonce-based replay protection.
+- Deadline enforcement.
 
-**Code:** `contracts/Pattern2_BoundedAutonomy.sol`
+**Limitations:**
 
-This contract extends Pattern 1 with:
+- A valid signed Intent may be submitted by someone other than the signer.
+- The pattern does not implement a target allowlist or daily spending cap.
+- It does not independently establish that the target contract or calldata is safe.
+- A compromised signer key can authorize malicious Intents.
 
-- An admin-managed target allowlist.
-- A daily spending cap based on `block.timestamp / 1 days`.
-- An admin-controlled emergency stop and resume function.
-- An admin role assigned to the deployer.
+### Pattern 2 — Bounded Autonomy
 
-The `execute` function checks the target allowlist, emergency-stop state, and daily cap before delegating to the Pattern 1 execution logic.
+**Contract:** `contracts/Pattern2_BoundedAutonomy.sol`
 
-**Current scope:** these controls are present in the contract and have a corresponding Foundry test file at `test/test/Pattern2.t.sol`.
+Extends Pattern 1 with additional execution constraints.
 
-**Important limitations to review:** the daily accounting and external-call/reentrancy behaviour need additional adversarial testing. The contract does not provide a cooldown, role separation, multisig administration, or a time-delayed recovery process.
+**Implemented controls:**
 
-### Pattern 3: Multi-Agent Arbitration
+- Admin-managed target allowlist.
+- Daily spending cap based on `intent.value`.
+- Emergency stop and resume controls.
+- Spending accounting before the external execution call.
 
-**Code:** `contracts/Pattern3_MultiAgentArbitration.sol`
+The contract checks whether the target is allowlisted, resets the daily accounting period when necessary, verifies the spending cap, records the proposed spending, and then delegates execution to Pattern 1.
 
-This contract extends Pattern 1 with:
+**Reentrancy consideration:**
 
-- An arbiter-managed agent registry.
-- Proposal creation by registered agents.
+Spending is recorded before the external call. This ensures that a reentrant execution attempt encounters the updated spending amount.
+
+A targeted adversarial test checks an attempt to bypass the daily cap through reentrancy.
+
+**Limitations:**
+
+- The daily cap tracks native currency represented by `intent.value`; it does not account for ERC-20 transfers or other token exposure.
+- Administration is centralized in a single admin address.
+- Multisig administration and timelocked changes are not implemented.
+- The allowlist restricts destination addresses but does not validate the safety of individual functions or calldata.
+- The reentrancy test covers a specific attack scenario, not every possible vulnerability.
+
+### Pattern 3 — Multi-Agent Arbitration
+
+**Contract:** `contracts/Pattern3_MultiAgentArbitration.sol`
+
+Demonstrates a basic multi-agent proposal and arbitration workflow.
+
+**Implemented controls:**
+
+- Arbiter-managed agent registration.
+- Proposals submitted by registered agents.
 - One vote per registered agent per proposal.
-- An arbiter decision to approve or reject a proposal.
-- Execution of an approved proposal through the inherited Pattern 1 logic.
+- Arbiter-controlled approval or rejection.
+- Execution through the inherited Planner / Executor mechanism.
 
-**Current scope:** proposal, voting, and arbiter-resolution functions are present in the contract and have a corresponding Foundry test file at `test/test/Pattern3.t.sol`.
+**Limitations:**
 
-**Important limitation:** the current implementation does not enforce a voting threshold or require a majority before execution. The arbiter can approve a proposal regardless of the recorded votes. Therefore, this is an arbiter-controlled proposal workflow, not a trustless consensus mechanism.
+- There is no enforced quorum or majority threshold.
+- The arbiter can approve or reject a proposal regardless of the vote count.
+- This is an arbiter-controlled workflow, not decentralized consensus.
 
----
+## What a Signature Does — and Does Not — Prove
+
+An EIP-712 signature binds authorization to the specified typed-data fields and signing domain.
+
+It allows the Executor to verify that the authorized signer approved the particular Intent being submitted.
+
+However, a valid signature does **not** prove:
+
+- That the AI agent reasoned correctly.
+- That the proposed action is economically safe.
+- That the target contract is trustworthy.
+- That the calldata has harmless effects.
+- That the wider application or off-chain environment is secure.
+
+Signature verification is one security boundary, not a complete security guarantee.
 
 ## Security Model
 
-The implementation demonstrates several controls, but each has a limited scope:
+The project explores several complementary controls:
 
-- **Separation of duties:** planning and on-chain execution are separate components.
-- **Typed authorization:** EIP-712 binds the signature to the Intent fields and domain.
-- **Replay protection:** the Executor nonce prevents reuse of an already-consumed sequential nonce.
-- **Expiry:** the deadline limits how long a signed Intent remains valid.
-- **Input validation:** the Python signer validates addresses, integer ranges, required environment variables, and calldata hex.
-- **Mainnet guard:** the Python signer blocks chain ID `1` by default unless `ALLOW_MAINNET_SIGNING=1` is explicitly set.
-- **Pattern 2 controls:** target allowlisting, daily value cap, and emergency stop are implemented in the Pattern 2 contract.
-- **Pattern 3 controls:** registered-agent checks and arbiter-only management/resolution are implemented in the Pattern 3 contract.
+| Area | Implemented mechanism |
+|---|---|
+| Authorization | EIP-712 signed Intents |
+| Replay protection | Nonce validation |
+| Expiration | Intent deadline |
+| Target restriction | Pattern 2 allowlist |
+| Spending restriction | Pattern 2 daily native-asset cap |
+| Emergency control | Pattern 2 stop/resume |
+| Agent participation | Pattern 3 registration and voting |
+| Arbitration | Pattern 3 arbiter approval/rejection |
+| Off-chain signing | Python Intent signer |
 
-### Risks and limitations
+The Python signer includes input validation and a mainnet signing guard. Mainnet signing is blocked by default unless `ALLOW_MAINNET_SIGNING=1` is explicitly configured.
 
-- If the `agentSigner` private key is compromised, an attacker may authorize arbitrary Intents within the controls of the deployed Executor.
-- A valid signed Intent may be submitted by someone other than the intended submitter. The current Intent does not bind a specific relayer or submitter.
-- A long deadline increases the period in which a leaked signature may be used.
-- The base Pattern 1 contract allows calls to any target named in a valid signed Intent.
-- Pattern 2's allowlist and spending cap are only as reliable as their administration and accounting logic; further adversarial tests are needed.
-- Pattern 3's arbiter has decisive authority; recorded votes do not currently constrain the arbiter's decision.
-- Environment variables are not a secure key-management system by themselves. Protect the host, shell history, process environment, and logs.
-- Test success does not establish that the contracts are free of vulnerabilities.
+### Important risks
 
-### Safe-use guidance
+- Compromise of the agent signing key can allow unauthorized Intents.
+- A valid signed Intent may be submitted by another party.
+- Long deadlines increase the period during which an Intent can be submitted.
+- Pattern 1 permits arbitrary targets unless additional restrictions are implemented.
+- Pattern 2's daily cap only tracks native currency represented by `intent.value`.
+- Pattern 2 uses centralized administration.
+- Pattern 3 relies on an authoritative arbiter.
+- Environment variables are not a complete key-management solution.
+- Passing tests do not prove the absence of vulnerabilities.
 
-- Use a dedicated test-only key with no real funds while learning.
-- Never commit `.env`, private keys, or seed phrases.
-- Verify the chain ID, deployed Executor address, signer address, target address, and nonce independently.
-- Do not enable mainnet signing merely because the script permits an explicit opt-in.
-- Review and test every target contract that the Executor may call.
-- Obtain an independent security review before considering any real-value deployment.
+### Safer development practices
 
----
+- Use test-only private keys.
+- Never commit private keys, seed phrases, or populated `.env` files.
+- Use short Intent deadlines where practical.
+- Verify the chain ID, signer, executor, target, nonce, value, and calldata.
+- Review target contracts before allowlisting them.
+- Monitor administrative actions and execution events.
+- Do not use real funds without independent security review and additional hardening.
 
 ## Repository Status
 
-| Component | Code present | Test file present | Notes |
-|---|---:|---:|---|
-| Pattern 1: Planner / Executor | Yes | Yes | Base signed-Intent execution |
-| Pattern 2: Bounded Autonomy | Yes | Yes | Allowlist, daily cap, emergency stop |
-| Pattern 3: Multi-Agent Arbitration | Yes | Yes | Arbiter decision is authoritative; votes do not enforce a threshold |
-| Python Intent signer | Yes | Yes | Input validation and EIP-712 signing |
+| Component | Implementation | Tests |
+|---|---|---|
+| Pattern 1 — Planner / Executor | Present | Present |
+| Pattern 2 — Bounded Autonomy | Present | Present |
+| Pattern 3 — Multi-Agent Arbitration | Present | Present |
+| Python Intent signer | Present | Present |
 
-The presence of source code or test files is not, by itself, evidence that tests passed. Check the latest GitHub Actions run and/or execute the commands below to verify test results.
-
----
+The presence of test files does not, by itself, establish that tests have passed. Run the commands in the Testing section or inspect the GitHub Actions results to verify the current status.
 
 ## Quick Start
 
 ### Requirements
 
 - Git
-- Foundry (`forge`)
-- Python 3.10 or newer, using a version compatible with the pinned Python dependencies
+- Foundry
+- Python 3.10 or newer
+- Python dependencies listed in `requirements.txt`
 
 ### Clone the repository
 
 ```bash
 git clone https://github.com/meekail1996-a11y/miki-onchain-agent-patterns.git
 cd miki-onchain-agent-patterns
-```
-
-### Install Solidity dependencies
-
-The repository tracks `forge-std` and OpenZeppelin as Git submodules. Initialize them with:
-
-```bash
 git submodule update --init --recursive
 ```
-
-If the submodules are not available in your checkout, consult `.gitmodules` and the repository's dependency configuration before installing alternate versions.
 
 ### Run Solidity tests
 
@@ -195,7 +230,7 @@ forge test
 python -m pip install -r requirements.txt
 ```
 
-### Run Python validation tests
+### Run Python tests
 
 ```bash
 python -m unittest discover -s tests -v
@@ -203,38 +238,55 @@ python -m unittest discover -s tests -v
 
 ### Sign a test Intent
 
-Copy `.env.example` to `.env` locally and replace the placeholders with values from your own local or test deployment. Do not commit `.env`.
+Copy `.env.example` to `.env` and configure the required values for a local test deployment. Never commit `.env`.
 
-PowerShell example:
+Example PowerShell environment variables:
 
 ```powershell
-$env:PRIVATE_KEY = "YOUR_TEST_WALLET_PRIVATE_KEY"
-$env:CHAIN_ID = "31337"
-$env:CONTRACT_ADDRESS = "YOUR_DEPLOYED_EXECUTOR_ADDRESS"
-$env:TARGET_ADDRESS = "YOUR_INTENDED_TARGET_ADDRESS"
-$env:INTENT_NONCE = "0"
+$env:PRIVATE_KEY="YOUR_TEST_PRIVATE_KEY"
+$env:CHAIN_ID="31337"
+$env:CONTRACT_ADDRESS="YOUR_LOCAL_EXECUTOR_ADDRESS"
+$env:TARGET_ADDRESS="YOUR_TEST_TARGET_ADDRESS"
+$env:INTENT_NONCE="0"
+```
 
+**Important:** `INTENT_NONCE` must match the Executor's current on-chain nonce for the signer. Do not guess or reuse a nonce. The value `0` is only an example for a fresh local test deployment.
+
+The signing script also supports optional `INTENT_VALUE`, `INTENT_DATA`, and `INTENT_TTL` settings.
+
+Run the script:
+
+```bash
 python scripts/sign_intent.py
 ```
 
-The script creates a signature; it does not submit a transaction. A signature is sensitive authorization data. Share it only when you understand exactly what it authorizes.
+The script produces an EIP-712 signature; it does not submit a blockchain transaction.
 
----
+**Never use a private key that has been shared publicly or exposed in chat, source code, logs, or screenshots.**
 
 ## Testing
 
-Run both test suites from the repository root:
+Run the test suites independently:
 
 ```bash
-python -m unittest discover -s tests -v
 forge test
 ```
 
-The repository includes Python validation tests and Foundry test files for Patterns 1, 2, and 3, plus Pattern 1 security cases.
+```bash
+python -m unittest discover -s tests -v
+```
 
-**Do not interpret the existence of test files or the commands above as proof that the tests passed.** Confirm the actual terminal output or the status and logs of the relevant GitHub Actions workflow run.
+The repository includes Solidity tests for Patterns 1, 2, and 3, security-focused tests, and Python tests for the Intent signer.
 
----
+Pattern 2 includes a targeted adversarial test for a reentrant attempt to exceed the daily spending cap.
+
+Test coverage is not exhaustive. Passing tests should not be interpreted as proof that the contracts or signer are free of vulnerabilities.
+
+For continuous integration, inspect the workflow under:
+
+```text
+.github/workflows/tests.yml
+```
 
 ## Project Structure
 
@@ -266,29 +318,24 @@ The repository includes Python validation tests and Foundry test files for Patte
 └── requirements.txt
 ```
 
----
-
 ## Roadmap
 
 - [x] Pattern 1: Planner / Executor reference contract
 - [x] Pattern 2: Bounded Autonomy contract
 - [x] Pattern 3: Multi-Agent Arbitration contract
-- [ ] Add adversarial tests for reentrancy and daily spending accounting
+- [x] Add a reentrancy-focused adversarial test for Pattern 2's daily spending cap
+- [ ] Expand adversarial tests for spending accounting and other execution edge cases
 - [ ] Add tests for zero-address and invalid configuration cases
 - [ ] Decide whether Pattern 3 should enforce a quorum/threshold or remain explicitly arbiter-controlled
 - [ ] Improve signer key management and operational guidance
 - [ ] Expand threat modeling and document deployment assumptions
 
----
-
 ## Contributing
 
-This project is being built in public. Issues, feedback, and pull requests are welcome, especially around threat modeling, test coverage, policy enforcement, and developer experience.
+Issues, feedback, and pull requests are welcome.
 
-Do not publish private keys, seed phrases, or exploitable security details in public issues.
-
----
+Please do not publish private keys, seed phrases, or exploitable security details in public issues.
 
 ## License
 
-MIT. See `LICENSE`.
+This project is licensed under the MIT License. See `LICENSE` for details.
