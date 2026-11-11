@@ -16,45 +16,100 @@ contract Pattern1Test is Test {
     }
 
     function test_ExecuteValidIntent() public {
-        Pattern1_PlannerExecutor.Intent memory intent = Pattern1_PlannerExecutor.Intent({
-            target: target,
-            value: 0,
-            data: "",
-            nonce: 0,
-            deadline: block.timestamp + 1 hours
-        });
+        Pattern1_PlannerExecutor.Intent memory intent =
+            Pattern1_PlannerExecutor.Intent({
+                target: target,
+                value: 0,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
         executor.execute(intent, _sign(intent));
         assertEq(executor.nonce(), 1);
     }
 
     function test_RevertWhenExpired() public {
-        Pattern1_PlannerExecutor.Intent memory intent = Pattern1_PlannerExecutor.Intent({
-            target: target,
-            value: 0,
-            data: "",
-            nonce: 0,
-            deadline: block.timestamp - 1
-        });
+        Pattern1_PlannerExecutor.Intent memory intent =
+            Pattern1_PlannerExecutor.Intent({
+                target: target,
+                value: 0,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp - 1
+            });
+
         vm.expectRevert();
         executor.execute(intent, _sign(intent));
     }
 
     function test_RevertWhenWrongNonce() public {
-        Pattern1_PlannerExecutor.Intent memory intent = Pattern1_PlannerExecutor.Intent({
-            target: target,
-            value: 0,
-            data: "",
-            nonce: 5,
-            deadline: block.timestamp + 1 hours
-        });
+        Pattern1_PlannerExecutor.Intent memory intent =
+            Pattern1_PlannerExecutor.Intent({
+                target: target,
+                value: 0,
+                data: "",
+                nonce: 5,
+                deadline: block.timestamp + 1 hours
+            });
+
         vm.expectRevert();
         executor.execute(intent, _sign(intent));
     }
 
-    function _sign(Pattern1_PlannerExecutor.Intent memory intent) internal view returns (bytes memory) {
+    function test_RevertWhenReplayingUsedIntent() public {
+        Pattern1_PlannerExecutor.Intent memory intent =
+            Pattern1_PlannerExecutor.Intent({
+                target: target,
+                value: 0,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
+        bytes memory signature = _sign(intent);
+
+        executor.execute(intent, signature);
+
+        vm.expectRevert(
+            Pattern1_PlannerExecutor.InvalidNonce.selector
+        );
+        executor.execute(intent, signature);
+    }
+
+function test_RevertWhenSignatureIsInvalid() public {
+    Pattern1_PlannerExecutor.Intent memory intent =
+        Pattern1_PlannerExecutor.Intent({
+            target: target,
+            value: 0,
+            data: "",
+            nonce: 0,
+            deadline: block.timestamp + 1 hours
+        });
+
+    uint256 wrongPrivateKey = 0xB0B;
+    bytes32 digest = keccak256("invalid signature");
+
+    (uint8 v, bytes32 r, bytes32 s) =
+        vm.sign(wrongPrivateKey, digest);
+
+    bytes memory invalidSignature = abi.encodePacked(r, s, v);
+
+    vm.expectRevert(
+        Pattern1_PlannerExecutor.InvalidSignature.selector
+    );
+
+    executor.execute(intent, invalidSignature);
+}
+
+    function _sign(
+        Pattern1_PlannerExecutor.Intent memory intent
+    ) internal view returns (bytes memory) {
         bytes32 structHash = keccak256(
             abi.encode(
-                keccak256("Intent(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline)"),
+                keccak256(
+                    "Intent(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline)"
+                ),
                 intent.target,
                 intent.value,
                 keccak256(intent.data),
@@ -62,17 +117,25 @@ contract Pattern1Test is Test {
                 intent.deadline
             )
         );
+
         bytes32 domainSeparator = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
                 keccak256("Pattern1_PlannerExecutor"),
                 keccak256("1"),
                 block.chainid,
                 address(executor)
             )
         );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", domainSeparator, structHash)
+        );
+
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(SIGNER_PK, digest);
+
         return abi.encodePacked(r, s, v);
     }
 }
