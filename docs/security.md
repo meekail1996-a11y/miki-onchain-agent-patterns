@@ -39,6 +39,7 @@ The project is an educational and experimental reference for exploring how AI ag
 - Enforces a daily spending cap for native asset value.
 - Includes emergency stop and resume controls.
 - Updates spending accounting before making the inherited external execution call.
+- Uses a reentrancy guard on `execute`, in addition to the checks-effects-interactions ordering.
 - Includes adversarial testing for reentrancy against the daily spending limit.
 
 ### Known Limitations
@@ -54,16 +55,47 @@ The project is an educational and experimental reference for exploring how AI ag
 ### Security Controls
 
 - Requires agents to register before participating.
-- Allows registered agents to create proposals.
+- Disables the inherited public `execute` path: direct execution reverts with `DirectExecutionDisabled` for every caller, including the arbiter. Execution is reachable only through `resolveArbitration`.
+- Validates the EIP-712 signature and the Intent deadline when a proposal is created, and validates the signature again at execution time.
 - Restricts each registered agent to one vote per proposal.
-- Uses an arbiter to approve or reject proposals.
+- Snapshots a quorum per proposal and refuses execution while approvals are below it.
+- Snapshots voter eligibility per proposal, so agents added later cannot vote on earlier proposals.
+- Makes rejection terminal: a rejected proposal can never be executed, and cannot be voted on or resolved again.
+- Reserves each executor nonce for at most one live proposal, so two approved proposals can never compete for the same nonce.
+- Guards arbiter resolution with a reentrancy lock.
+- Records execution status before the external call, so a failed execution leaves the proposal pending instead of permanently consumed.
+
+### Voter Eligibility and Quorum
+
+- Each agent records the proposal index at which it was admitted. An agent may vote on a proposal only if it was admitted no later than that proposal's creation.
+- Quorum is a strict majority of the agents registered at proposal creation time: `agentCount / 2 + 1`, stored per proposal and never recomputed.
+- Removing an agent blocks its future votes but does not retract votes it already cast, and does not change any existing proposal's quorum.
+- Re-admission grants fresh eligibility only: a re-admitted agent cannot vote on proposals created before it was re-admitted, including proposals created before its earlier removal.
+
+### Nonce Policy
+
+- `propose` rejects Intents whose nonce is below the executor's current nonce, and rejects a nonce already reserved by a live proposal.
+- Proposals for future nonces may be queued. They become executable only once the executor nonce reaches them; until then `resolveArbitration` reverts with `InvalidNonce` and the proposal stays pending.
+- A terminal rejection releases the nonce reservation so a different Intent can use it. An executed proposal advances the nonce permanently.
 
 ### Known Limitations
 
-- There is no quorum or minimum voting threshold.
-- The arbiter retains decisive authority over proposal outcomes.
-- The implementation should not be considered decentralized consensus.
+- The arbiter controls agent membership. Because the arbiter can register agents it controls, quorum only constrains an arbiter whose agents are genuinely independent. Separating agent admission from arbitration is not implemented.
+- The arbiter retains decisive authority over proposal outcomes and has no enforced timeout or automatic escalation.
+- There is no quorum-independent fallback: if agents stop voting, nothing executes.
+- Pattern 3 implements neither a target allowlist nor a native-asset spending cap. A quorum-approved Intent may call any non-zero address with an arbitrary `value`. Those controls exist only in Pattern 2.
+- Quorum is immutable per proposal, so removing agents can make an existing proposal permanently unable to reach its threshold. Such a proposal can only be closed by an explicit rejection.
+- Votes cast before an agent was removed continue to count. Retracting them would let an arbiter erase rejections and change outcomes, so the current behaviour is deliberately conservative.
+- An agent holding a valid signed Intent can reserve the current nonce with it and then abstain, stalling new proposals until the arbiter rejects that proposal. Signature validation prevents unsigned reservations but cannot prevent squatting with a genuine signature.
+- Arbiter rotation and recovery are deliberately not implemented. A lost arbiter key freezes every proposal permanently, including the rejection path used to release reserved nonces.
 - Agent registration and voting do not independently guarantee that proposals are correct or safe.
+- The implementation should not be considered decentralized consensus.
+
+### Storage Layout and Upgradeability
+
+- The Pattern 3 storage layout changed when quorum, eligibility epochs, nonce reservations, and the proposal status enum were introduced; `Proposal.executed` was replaced by `Proposal.status`, and new state variables were added.
+- Patterns 1-3 are designed for fresh deployments. They are **not** proxy-storage compatible: upgrading an existing proxy to these versions would misalign storage slots.
+- If upgradeability is required, the storage layout must be designed and frozen separately, and the contracts re-reviewed for upgrade safety.
 
 ## Operational Security Recommendations
 
@@ -72,6 +104,7 @@ The project is an educational and experimental reference for exploring how AI ag
 - Use short Intent deadlines where practical.
 - Verify the chain ID, signer, executor address, target address, nonce, and value before signing or submitting an Intent.
 - Review target contracts and their callable functions before adding them to an allowlist.
+- Deploy Pattern 3 with a multisig or timelock as the arbiter, since arbiter rotation is not implemented.
 - Monitor execution events and administrative changes.
 - Keep administrative credentials secure and consider multisig and timelock controls before any real-world deployment.
 - Do not use real funds without independent security review and appropriate hardening.
@@ -90,6 +123,9 @@ This repository is an educational and experimental project.
 Potential improvements include:
 
 - Multisig and timelock-based administration.
+- Two-step arbiter transfer, so a lost arbiter key does not freeze governance.
+- A separate agent-admission role, so quorum cannot be minted by the approving arbiter.
+- Explicit expiry or timeout handling for proposals that can no longer reach quorum.
 - Stronger configuration validation.
 - Expanded threat modeling.
 - Additional adversarial and invariant testing.
