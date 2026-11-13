@@ -310,6 +310,7 @@ Passing tests demonstrate that the tested scenarios behave as expected. They do 
 - [x] Governance-only execution, per-proposal quorum snapshots and voter eligibility snapshots in Pattern 3.
 - [x] Nonce reservation policy and terminal rejection for Pattern 3 proposals.
 - [x] Zero-address and invalid-configuration coverage.
+- [x] Fuzz tests for the daily spending cap and its accounting invariants.
 - [x] Threat model, known limitations and deployment assumptions documented in [Security Model](docs/security.md).
 - [x] CI running both the Solidity and Python suites on every push to `main`.
 
@@ -320,7 +321,6 @@ Passing tests demonstrate that the tested scenarios behave as expected. They do 
 - [ ] A separate agent-admission role for Pattern 3.
 - [ ] More flexible target and function-level policies.
 - [ ] ERC-20 spending limits.
-- [ ] Fuzz and invariant tests for spending accounting.
 - [ ] Formal verification of critical execution properties.
 - [ ] Improved monitoring guidance.
 
