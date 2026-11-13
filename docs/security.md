@@ -15,6 +15,27 @@ The project is an educational and experimental reference for exploring how AI ag
 - External calls and state updates must be designed with reentrancy risks in mind.
 - Passing tests does not prove that a contract is free from vulnerabilities.
 
+## Mitigations
+
+The implementation maps the most relevant threats to concrete on-chain controls:
+
+| Threat | Control | Where |
+|---|---|---|
+| Replay of an already executed Intent | Monotonic nonce checked before the call and incremented before it | Pattern 1 |
+| Stale or expired authorization | Deadline enforced before signature verification and before any state change; Pattern 3 also rejects expired Intents at proposal creation | Pattern 1, Pattern 3 |
+| Signature forgery or malleability | EIP-712 domain-separated digest, low-`s` enforcement from OpenZeppelin `ECDSA`, and `tryRecover` mapped to a single `InvalidSignature` failure | Pattern 1 |
+| Cross-chain or cross-contract replay | Domain separator binds `chainId` and `verifyingContract` | Pattern 1 |
+| Direct execution bypassing governance | Inherited `execute` overridden to always revert with `DirectExecutionDisabled` | Pattern 3 |
+| Arbitrary target or native-value drain | Admin allowlist and daily native-asset cap checked before the external call | Pattern 2 |
+| Reentrancy during execution | Nonce and spending accounting updated before the external call, plus a reentrancy guard on `execute` and on `resolveArbitration` | Pattern 2, Pattern 3 |
+| Approval without sufficient support | Per-proposal quorum snapshot of a strict majority, checked at resolution | Pattern 3 |
+| Late-joining agents voting on older proposals | Per-proposal voter eligibility snapshot (`agentEpoch`) | Pattern 3 |
+| Reviving a rejected proposal | Terminal `Rejected` status; execution and further votes revert | Pattern 3 |
+| Competing proposals for one nonce | One live proposal per nonce; stale nonces rejected at creation | Pattern 3 |
+| Zero-address configuration mistakes | `InvalidTarget`, `InvalidAgent` and `InvalidArbiter` guards | Pattern 2, Pattern 3 |
+
+Residual risks that these controls do not remove are listed under each pattern's Known Limitations.
+
 ## Pattern 1 — Signed Intent
 
 ### Security Controls

@@ -1,6 +1,8 @@
 
 # On-chain Agent Patterns
 
+[![Tests](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/actions/workflows/tests.yml/badge.svg)](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/actions/workflows/tests.yml)
+
 **A learning-oriented reference project for constrained AI-agent interactions with smart contracts.**
 
 This repository explores how to separate off-chain AI decision-making from on-chain execution authority.
@@ -300,14 +302,27 @@ Passing tests demonstrate that the tested scenarios behave as expected. They do 
 
 ## Roadmap
 
-Potential future improvements include:
+### Completed
 
-- Multisig or timelocked administrative controls.
-- More flexible target and function-level policies.
-- ERC-20 spending limits.
-- Additional adversarial and invariant tests.
-- Formal verification of critical execution properties.
-- Improved monitoring and operational security documentation.
+- [x] Pattern 1, 2 and 3 reference contracts.
+- [x] EIP-712 Intent signing with a Python reference signer.
+- [x] Reentrancy-focused adversarial test for Pattern 2's daily spending cap.
+- [x] Governance-only execution, per-proposal quorum snapshots and voter eligibility snapshots in Pattern 3.
+- [x] Nonce reservation policy and terminal rejection for Pattern 3 proposals.
+- [x] Zero-address and invalid-configuration coverage.
+- [x] Threat model, known limitations and deployment assumptions documented in [Security Model](docs/security.md).
+- [x] CI running both the Solidity and Python suites on every push to `main`.
+
+### Planned
+
+- [ ] Multisig or timelocked administrative controls.
+- [ ] Two-step arbiter rotation, so a lost arbiter key cannot freeze governance.
+- [ ] A separate agent-admission role for Pattern 3.
+- [ ] More flexible target and function-level policies.
+- [ ] ERC-20 spending limits.
+- [ ] Fuzz and invariant tests for spending accounting.
+- [ ] Formal verification of critical execution properties.
+- [ ] Improved monitoring guidance.
 
 These are potential future directions, not currently implemented features.
 
