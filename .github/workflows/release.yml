@@ -30,9 +30,9 @@ jobs:
           notes="$RUNNER_TEMP/release-notes.md"
           if [ -f CHANGELOG.md ]; then
             awk -v v="$VERSION" '
-              $0 ~ "^## \\[" v "\\]" { inside = 1; next }
-              inside && /^## \[/ { exit }
-              inside && /^\[[^]]+\]: / { exit }
+              index($0, "## [" v "]") == 1 { inside = 1; next }
+              inside && index($0, "## [") == 1 { exit }
+              inside && substr($0, 1, 1) == "[" && index($0, "]:") > 0 { exit }
               inside { print }
             ' CHANGELOG.md > "$notes"
           fi
