@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import "../../contracts/Pattern2_BoundedAutonomy.sol";
+import "../contracts/Pattern2_BoundedAutonomy.sol";
 
 contract Pattern2Test is Test {
     Pattern2_BoundedAutonomy bounded;
