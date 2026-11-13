@@ -37,9 +37,10 @@ contract Pattern1_PlannerExecutor is EIP712 {
 
     // تغییر: calldata به memory
     function execute(Intent memory intent, bytes memory signature) public virtual {
-        if (block.timestamp > intent.deadline) revert IntentExpired();
-        if (intent.nonce != nonce) revert InvalidNonce();
+        _executeIntent(intent, signature);
+    }
 
+    function _intentDigest(Intent memory intent) internal view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
                 INTENT_TYPEHASH,
@@ -51,12 +52,32 @@ contract Pattern1_PlannerExecutor is EIP712 {
             )
         );
 
-        bytes32 digest = _hashTypedDataV4(structHash);
-        if (digest.recover(signature) != agentSigner) revert InvalidSignature();
+        return _hashTypedDataV4(structHash);
+    }
+
+    function _verifyIntentSignature(
+        Intent memory intent,
+        bytes memory signature
+    ) internal view {
+        (address recovered, ECDSA.RecoverError err, ) =
+            _intentDigest(intent).tryRecover(signature);
+
+        if (err != ECDSA.RecoverError.NoError || recovered != agentSigner) {
+            revert InvalidSignature();
+        }
+    }
+
+    function _executeIntent(
+        Intent memory intent,
+        bytes memory signature
+    ) internal {
+        if (block.timestamp > intent.deadline) revert IntentExpired();
+        if (intent.nonce != nonce) revert InvalidNonce();
+
+        _verifyIntentSignature(intent, signature);
 
         nonce++;
 
-        // رویداد قبل از call خارجی emit می‌شود
         emit IntentExecuted(intent.target, intent.value, intent.nonce);
 
         (bool ok, ) = intent.target.call{value: intent.value}(intent.data);

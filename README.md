@@ -1,3 +1,4 @@
+
 # On-chain Agent Patterns
 
 **A learning-oriented reference project for constrained AI-agent interactions with smart contracts.**
@@ -31,24 +32,24 @@ The goal is not to prove that an AI agent always makes safe decisions. The goal 
 
 ```text
 User / Application
-        |
-        v
-     Planner
-  (AI / Off-chain logic)
-        |
-        v
-  Optional Policy /
-   Review Layer
-        |
-        v
-     Signer
- (Intent authorization)
-        |
-        v
-  On-chain Executor
-        |
-        v
-   Target Contract
+       |
+       v
+    Planner
+ (AI / Off-chain logic)
+       |
+       v
+ Optional Policy /
+  Review Layer
+       |
+       v
+    Signer
+(Intent authorization)
+       |
+       v
+ On-chain Executor
+       |
+       v
+  Target Contract
 ```
 
 The optional policy or review layer is an architectural possibility, not a claim that every pattern in this repository implements such a layer.
@@ -84,6 +85,7 @@ The Executor validates the signature, checks the expected nonce and deadline, an
 - The pattern does not implement a target allowlist or daily spending cap.
 - It does not independently establish that the target contract or calldata is safe.
 - A compromised signer key can authorize malicious Intents.
+- The signer authorizes the exact Intent, but signature verification does not establish that the intended action is safe.
 
 ### Pattern 2 — Bounded Autonomy
 
@@ -112,27 +114,59 @@ A targeted adversarial test checks an attempt to bypass the daily cap through re
 - Administration is centralized in a single admin address.
 - Multisig administration and timelocked changes are not implemented.
 - The allowlist restricts destination addresses but does not validate the safety of individual functions or calldata.
-- The reentrancy test covers a specific attack scenario, not every possible vulnerability.
+- The reentrancy test covers specific attack scenarios, not every possible vulnerability.
 
 ### Pattern 3 — Multi-Agent Arbitration
 
 **Contract:** `contracts/Pattern3_MultiAgentArbitration.sol`
 
-Demonstrates a basic multi-agent proposal and arbitration workflow.
+Demonstrates a multi-agent proposal and arbiter-controlled approval workflow.
 
 **Implemented controls:**
 
-- Arbiter-managed agent registration.
+- Arbiter-managed agent registration and removal.
 - Proposals submitted by registered agents.
 - One vote per registered agent per proposal.
+- A proposal-specific quorum calculated when the proposal is created.
 - Arbiter-controlled approval or rejection.
+- Nonce reservation to prevent multiple proposals from using the same nonce.
 - Execution through the inherited Planner / Executor mechanism.
+- Reentrancy protection during arbitration resolution.
+
+**Voting and quorum behavior:**
+
+- The quorum is calculated as `(agentCount / 2) + 1` when a proposal is created.
+- An approval requires the number of affirmative votes to reach the proposal's stored quorum.
+- The quorum is a snapshot and does not change when agents are subsequently removed.
+- Agents registered after a proposal is created cannot vote on that older proposal.
+- Rejection votes do not automatically reject a proposal. The arbiter makes the final rejection decision.
+- The arbiter cannot approve a proposal unless its affirmative votes satisfy the stored quorum.
+
+**Nonce behavior:**
+
+- A proposal reserves its Intent nonce when created.
+- Two proposals cannot reserve the same nonce simultaneously.
+- A proposal with a future nonce can be created before earlier nonces are executed.
+- A future-nonce proposal cannot be executed until its nonce matches the Executor's current nonce.
+- Rejecting a proposal releases its reserved nonce.
+
+**Roles:**
+
+The signing authority (`agentSigner`) and the registered voting agents serve different purposes.
+
+The signer authorizes the Intent using an EIP-712 signature. Registered agents participate in proposal voting. Registration as a voting agent does not, by itself, grant signing authority.
 
 **Limitations:**
 
-- There is no enforced quorum or majority threshold.
-- The arbiter can approve or reject a proposal regardless of the vote count.
-- This is an arbiter-controlled workflow, not decentralized consensus.
+- The arbiter is a centralized authority and makes the final approval or rejection decision.
+- The arbiter cannot bypass the proposal's affirmative-vote quorum when approving it.
+- Rejection votes do not trigger automatic rejection.
+- The quorum is fixed at proposal creation; removing agents does not lower it.
+- A proposal may become difficult or impossible to approve if its quorum can no longer be reached.
+- The arbiter is configured at deployment; arbiter rotation is not implemented.
+- Multisig arbitration and timelocked arbitration are not implemented.
+- There is no target allowlist or daily spending cap in Pattern 3.
+- The pattern demonstrates controlled arbitration, not decentralized consensus.
 
 ## What a Signature Does — and Does Not — Prove
 
@@ -163,7 +197,10 @@ The project explores several complementary controls:
 | Spending restriction | Pattern 2 daily native-asset cap |
 | Emergency control | Pattern 2 stop/resume |
 | Agent participation | Pattern 3 registration and voting |
+| Proposal quorum | Pattern 3 proposal-specific quorum |
+| Nonce reservation | Pattern 3 proposal nonce reservation |
 | Arbitration | Pattern 3 arbiter approval/rejection |
+| Reentrancy protection | Pattern 2 spending-order protection and Pattern 3 ReentrancyGuard |
 | Off-chain signing | Python Intent signer |
 
 The Python signer includes input validation and a mainnet signing guard. Mainnet signing is blocked by default unless `ALLOW_MAINNET_SIGNING=1` is explicitly configured.
@@ -177,8 +214,9 @@ The Python signer includes input validation and a mainnet signing guard. Mainnet
 - Pattern 2's daily cap only tracks native currency represented by `intent.value`.
 - Pattern 2 uses centralized administration.
 - Pattern 3 relies on an authoritative arbiter.
+- Pattern 3 does not implement target allowlisting or spending limits.
 - Environment variables are not a complete key-management solution.
-- Passing tests do not prove the absence of vulnerabilities.
+- Passing tests does not prove the absence of vulnerabilities.
 
 ### Safer development practices
 
@@ -238,104 +276,43 @@ python -m unittest discover -s tests -v
 
 ### Sign a test Intent
 
-Copy `.env.example` to `.env` and configure the required values for a local test deployment. Never commit `.env`.
+Refer to the Python signer documentation and example configuration before running the signing script.
 
-Example PowerShell environment variables:
-
-```powershell
-$env:PRIVATE_KEY="YOUR_TEST_PRIVATE_KEY"
-$env:CHAIN_ID="31337"
-$env:CONTRACT_ADDRESS="YOUR_LOCAL_EXECUTOR_ADDRESS"
-$env:TARGET_ADDRESS="YOUR_TEST_TARGET_ADDRESS"
-$env:INTENT_NONCE="0"
-```
-
-**Important:** `INTENT_NONCE` must match the Executor's current on-chain nonce for the signer. Do not guess or reuse a nonce. The value `0` is only an example for a fresh local test deployment.
-
-The signing script also supports optional `INTENT_VALUE`, `INTENT_DATA`, and `INTENT_TTL` settings.
-
-Run the script:
-
-```bash
-python scripts/sign_intent.py
-```
-
-The script produces an EIP-712 signature; it does not submit a blockchain transaction.
-
-**Never use a private key that has been shared publicly or exposed in chat, source code, logs, or screenshots.**
+Use test-only private keys and never expose real private keys or seed phrases.
 
 ## Testing
 
-Run the test suites independently:
+Run the complete Solidity test suite:
 
 ```bash
-forge test
+forge test -vv
 ```
+
+Run the Python test suite:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-The repository includes Solidity tests for Patterns 1, 2, and 3, security-focused tests, and Python tests for the Intent signer.
+The test suites cover signature validation, nonce handling, execution constraints, agent voting, arbitration, and selected adversarial scenarios.
 
-Pattern 2 includes a targeted adversarial test for a reentrant attempt to exceed the daily spending cap.
-
-Test coverage is not exhaustive. Passing tests should not be interpreted as proof that the contracts or signer are free of vulnerabilities.
-
-For continuous integration, inspect the workflow under:
-
-```text
-.github/workflows/tests.yml
-```
-
-## Project Structure
-
-```text
-.
-├── contracts/
-│   ├── Pattern1_PlannerExecutor.sol
-│   ├── Pattern2_BoundedAutonomy.sol
-│   └── Pattern3_MultiAgentArbitration.sol
-├── scripts/
-│   └── sign_intent.py
-├── test/
-│   ├── Pattern1.t.sol
-│   ├── SecurityTests.t.sol
-│   └── test/
-│       ├── Pattern2.t.sol
-│       └── Pattern3.t.sol
-├── tests/
-│   └── test_sign_intent.py
-├── docs/
-│   ├── patterns.md
-│   └── security.md
-├── .github/
-│   └── workflows/
-│       └── tests.yml
-├── .env.example
-├── .gitmodules
-├── foundry.toml
-└── requirements.txt
-```
+Passing tests demonstrate that the tested scenarios behave as expected. They do not constitute a formal verification or a complete security audit.
 
 ## Roadmap
 
-- [x] Pattern 1: Planner / Executor reference contract
-- [x] Pattern 2: Bounded Autonomy contract
-- [x] Pattern 3: Multi-Agent Arbitration contract
-- [x] Add a reentrancy-focused adversarial test for Pattern 2's daily spending cap
-- [ ] Expand adversarial tests for spending accounting and other execution edge cases
-- [ ] Add tests for zero-address and invalid configuration cases
-- [ ] Decide whether Pattern 3 should enforce a quorum/threshold or remain explicitly arbiter-controlled
-- [ ] Improve signer key management and operational guidance
-- [ ] Expand threat modeling and document deployment assumptions
+Potential future improvements include:
 
-## Contributing
+- Multisig or timelocked administrative controls.
+- More flexible target and function-level policies.
+- ERC-20 spending limits.
+- Additional adversarial and invariant tests.
+- Formal verification of critical execution properties.
+- Improved monitoring and operational security documentation.
 
-Issues, feedback, and pull requests are welcome.
+These are potential future directions, not currently implemented features.
 
-Please do not publish private keys, seed phrases, or exploitable security details in public issues.
+---
 
-## License
+## Disclaimer
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+This repository is an educational reference project. It is not intended for production use or the management of real funds without further development, independent security review, and appropriate operational safeguards.
