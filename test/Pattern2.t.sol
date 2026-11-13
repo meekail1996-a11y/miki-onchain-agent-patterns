@@ -171,6 +171,225 @@ contract Pattern2Test is Test {
         assertTrue(attacker.reentryAttempted());
         assertFalse(attacker.reentrySucceeded());
     }
+
+    function test_RevertWhenNonAdminAddsTarget() public {
+        address unauthorized = makeAddr("unauthorized");
+        address newTarget = address(new MockTarget());
+
+        vm.prank(unauthorized);
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.NotAdmin.selector
+        );
+
+        bounded.addTarget(newTarget);
+    }
+
+    function test_RevertWhenNonAdminChangesSpendingCap() public {
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.NotAdmin.selector
+        );
+
+        bounded.setSpendingCap(10 ether);
+    }
+
+    function test_RevertWhenNonAdminResumesContract() public {
+        bounded.emergencyStop();
+
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.NotAdmin.selector
+        );
+
+        bounded.resume();
+    }
+
+    function test_AdminCanResumeContract() public {
+        bounded.emergencyStop();
+
+        assertTrue(bounded.emergencyStopped());
+
+        bounded.resume();
+
+        assertFalse(bounded.emergencyStopped());
+    }
+
+    function test_DailySpendingCapResetsOnNewDay() public {
+        vm.deal(address(bounded), 2 ether);
+
+        Pattern1_PlannerExecutor.Intent memory firstIntent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 0.6 ether,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
+        bounded.execute(firstIntent, _signIntent(firstIntent));
+
+        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.nonce(), 1);
+
+        uint256 nextDay =
+            (block.timestamp / 1 days + 1) * 1 days;
+
+        vm.warp(nextDay);
+
+        Pattern1_PlannerExecutor.Intent memory secondIntent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 0.6 ether,
+                data: "",
+                nonce: 1,
+                deadline: block.timestamp + 1 hours
+            });
+
+        bounded.execute(secondIntent, _signIntent(secondIntent));
+
+        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.nonce(), 2);
+        assertEq(
+            bounded.lastResetDay(),
+            block.timestamp / 1 days
+        );
+    }
+
+    function test_MultipleTransactionsCannotExceedDailySpendingCap()
+        public
+    {
+        vm.deal(address(bounded), 2 ether);
+
+        Pattern1_PlannerExecutor.Intent memory firstIntent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 0.6 ether,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
+        bounded.execute(firstIntent, _signIntent(firstIntent));
+
+        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.nonce(), 1);
+
+        Pattern1_PlannerExecutor.Intent memory secondIntent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 0.6 ether,
+                data: "",
+                nonce: 1,
+                deadline: block.timestamp + 1 hours
+            });
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.SpendingCapExceeded.selector
+        );
+
+        bounded.execute(secondIntent, _signIntent(secondIntent));
+
+        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.nonce(), 1);
+    }
+
+    function test_RevertWhenNonAdminTriggersEmergencyStop() public {
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.NotAdmin.selector
+        );
+
+        bounded.emergencyStop();
+
+        assertFalse(bounded.emergencyStopped());
+    }
+
+    function test_RevertWhenNonAdminRemovesTarget() public {
+        address unauthorized = makeAddr("unauthorized");
+
+        vm.prank(unauthorized);
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.NotAdmin.selector
+        );
+
+        bounded.removeTarget(address(attacker));
+
+        assertTrue(bounded.allowlistedTargets(address(attacker)));
+    }
+
+    function test_AdminCanRemoveTarget() public {
+        assertTrue(bounded.allowlistedTargets(address(attacker)));
+
+        bounded.removeTarget(address(attacker));
+
+        assertFalse(bounded.allowlistedTargets(address(attacker)));
+    }
+
+    function test_AdminCanUpdateSpendingCap() public {
+        assertEq(bounded.spendingCapPerDay(), 1 ether);
+
+        bounded.setSpendingCap(2 ether);
+
+        assertEq(bounded.spendingCapPerDay(), 2 ether);
+    }
+
+    function test_ExecuteAtExactDailySpendingCap() public {
+        vm.deal(address(bounded), 1 ether);
+
+        Pattern1_PlannerExecutor.Intent memory intent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 1 ether,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
+        bounded.execute(intent, _signIntent(intent));
+
+        assertEq(bounded.spentToday(), 1 ether);
+        assertEq(bounded.nonce(), 1);
+        assertEq(attacker.received(), 1 ether);
+    }
+
+    function test_RevertWhenTargetCallFailsAndRollsBackState()
+        public
+    {
+        RevertingTarget failingTarget = new RevertingTarget();
+
+        bounded.addTarget(address(failingTarget));
+
+        vm.deal(address(bounded), 1 ether);
+
+        Pattern1_PlannerExecutor.Intent memory intent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(failingTarget),
+                value: 0.4 ether,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
+        vm.expectRevert(
+    Pattern1_PlannerExecutor.CallFailed.selector
+);
+        bounded.execute(intent, _signIntent(intent));
+
+        assertEq(bounded.spentToday(), 0);
+        assertEq(bounded.nonce(), 0);
+        assertEq(address(bounded).balance, 1 ether);
+    }
 }
 
 contract ReentrancyAttacker {
@@ -225,4 +444,16 @@ contract ReentrancyAttacker {
 
 contract MockTarget {
     receive() external payable {}
+}
+
+contract RevertingTarget {
+    error TargetRejected();
+
+    fallback() external payable {
+        revert TargetRejected();
+    }
+
+    receive() external payable {
+        revert TargetRejected();
+    }
 }
