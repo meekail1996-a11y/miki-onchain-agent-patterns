@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -115,7 +114,7 @@ contract Pattern2Test is Test {
     }
 
     function test_RevertWhenEmergencyStopped() public {
-        bounded.emergencyStop();
+        bounded.emergencyStop(true);
 
         Pattern1_PlannerExecutor.Intent memory intent =
             Pattern1_PlannerExecutor.Intent({
@@ -127,7 +126,7 @@ contract Pattern2Test is Test {
             });
 
         vm.expectRevert(
-            Pattern2_BoundedAutonomy.EmergencyStopActive.selector
+            Pattern2_BoundedAutonomy.ContractPaused.selector
         );
 
         bounded.execute(intent, _signIntent(intent));
@@ -165,7 +164,7 @@ contract Pattern2Test is Test {
         );
 
         assertEq(bounded.nonce(), 1);
-        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.dailySpent(), 0.6 ether);
         assertEq(attacker.received(), 0.6 ether);
 
         assertTrue(attacker.reentryAttempted());
@@ -179,7 +178,7 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            Pattern2_BoundedAutonomy.NotAdmin.selector
+            "Not admin"
         );
 
         bounded.addTarget(newTarget);
@@ -191,34 +190,34 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            Pattern2_BoundedAutonomy.NotAdmin.selector
+            "Not admin"
         );
 
         bounded.setSpendingCap(10 ether);
     }
 
     function test_RevertWhenNonAdminResumesContract() public {
-        bounded.emergencyStop();
+        bounded.emergencyStop(true);
 
         address unauthorized = makeAddr("unauthorized");
 
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            Pattern2_BoundedAutonomy.NotAdmin.selector
+            "Not admin"
         );
 
-        bounded.resume();
+        bounded.emergencyStop(false);
     }
 
     function test_AdminCanResumeContract() public {
-        bounded.emergencyStop();
+        bounded.emergencyStop(true);
 
-        assertTrue(bounded.emergencyStopped());
+        assertTrue(bounded.paused());
 
-        bounded.resume();
+        bounded.emergencyStop(false);
 
-        assertFalse(bounded.emergencyStopped());
+        assertFalse(bounded.paused());
     }
 
     function test_DailySpendingCapResetsOnNewDay() public {
@@ -235,7 +234,7 @@ contract Pattern2Test is Test {
 
         bounded.execute(firstIntent, _signIntent(firstIntent));
 
-        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.dailySpent(), 0.6 ether);
         assertEq(bounded.nonce(), 1);
 
         uint256 nextDay =
@@ -254,10 +253,10 @@ contract Pattern2Test is Test {
 
         bounded.execute(secondIntent, _signIntent(secondIntent));
 
-        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.dailySpent(), 0.6 ether);
         assertEq(bounded.nonce(), 2);
         assertEq(
-            bounded.lastResetDay(),
+            bounded.lastSpendingResetDay(),
             block.timestamp / 1 days
         );
     }
@@ -278,7 +277,7 @@ contract Pattern2Test is Test {
 
         bounded.execute(firstIntent, _signIntent(firstIntent));
 
-        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.dailySpent(), 0.6 ether);
         assertEq(bounded.nonce(), 1);
 
         Pattern1_PlannerExecutor.Intent memory secondIntent =
@@ -296,7 +295,7 @@ contract Pattern2Test is Test {
 
         bounded.execute(secondIntent, _signIntent(secondIntent));
 
-        assertEq(bounded.spentToday(), 0.6 ether);
+        assertEq(bounded.dailySpent(), 0.6 ether);
         assertEq(bounded.nonce(), 1);
     }
 
@@ -306,12 +305,12 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            Pattern2_BoundedAutonomy.NotAdmin.selector
+            "Not admin"
         );
 
-        bounded.emergencyStop();
+        bounded.emergencyStop(true);
 
-        assertFalse(bounded.emergencyStopped());
+        assertFalse(bounded.paused());
     }
 
     function test_RevertWhenNonAdminRemovesTarget() public {
@@ -320,20 +319,20 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            Pattern2_BoundedAutonomy.NotAdmin.selector
+            "Not admin"
         );
 
         bounded.removeTarget(address(attacker));
 
-        assertTrue(bounded.allowlistedTargets(address(attacker)));
+        assertTrue(bounded.allowedTargets(address(attacker)));
     }
 
     function test_AdminCanRemoveTarget() public {
-        assertTrue(bounded.allowlistedTargets(address(attacker)));
+        assertTrue(bounded.allowedTargets(address(attacker)));
 
         bounded.removeTarget(address(attacker));
 
-        assertFalse(bounded.allowlistedTargets(address(attacker)));
+        assertFalse(bounded.allowedTargets(address(attacker)));
     }
 
     function test_AdminCanUpdateSpendingCap() public {
@@ -358,7 +357,7 @@ contract Pattern2Test is Test {
 
         bounded.execute(intent, _signIntent(intent));
 
-        assertEq(bounded.spentToday(), 1 ether);
+        assertEq(bounded.dailySpent(), 1 ether);
         assertEq(bounded.nonce(), 1);
         assertEq(attacker.received(), 1 ether);
     }
@@ -382,14 +381,60 @@ contract Pattern2Test is Test {
             });
 
         vm.expectRevert(
-    Pattern1_PlannerExecutor.CallFailed.selector
-);
+            Pattern1_PlannerExecutor.CallFailed.selector
+        );
         bounded.execute(intent, _signIntent(intent));
 
-        assertEq(bounded.spentToday(), 0);
+        assertEq(bounded.dailySpent(), 0);
         assertEq(bounded.nonce(), 0);
         assertEq(address(bounded).balance, 1 ether);
     }
+
+    function test_ReducingSpendingCapBelowSpentAmountBlocksFurtherSpending()
+        public
+    {
+        vm.deal(address(bounded), 1 ether);
+
+        Pattern1_PlannerExecutor.Intent memory firstIntent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 0.6 ether,
+                data: "",
+                nonce: 0,
+                deadline: block.timestamp + 1 hours
+            });
+
+        bounded.execute(firstIntent, _signIntent(firstIntent));
+
+        assertEq(bounded.dailySpent(), 0.6 ether);
+        assertEq(bounded.nonce(), 1);
+
+        // The admin may lower the cap below the amount already spent today.
+        bounded.setSpendingCap(0.5 ether);
+
+        assertEq(bounded.spendingCapPerDay(), 0.5 ether);
+        assertEq(bounded.dailySpent(), 0.6 ether);
+
+        Pattern1_PlannerExecutor.Intent memory secondIntent =
+            Pattern1_PlannerExecutor.Intent({
+                target: address(attacker),
+                value: 0.01 ether,
+                data: "",
+                nonce: 1,
+                deadline: block.timestamp + 1 hours
+            });
+
+        vm.expectRevert(
+            Pattern2_BoundedAutonomy.SpendingCapExceeded.selector
+        );
+
+        bounded.execute(secondIntent, _signIntent(secondIntent));
+
+        // A rejected execution must not change the spending total or nonce.
+        assertEq(bounded.dailySpent(), 0.6 ether);
+        assertEq(bounded.nonce(), 1);
+    }
+
 }
 
 contract ReentrancyAttacker {

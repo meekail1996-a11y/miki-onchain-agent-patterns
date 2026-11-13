@@ -2,57 +2,52 @@
 pragma solidity ^0.8.20;
 
 import "./Pattern1_PlannerExecutor.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
-    uint256 public spendingCapPerDay;
-    uint256 public spentToday;
-    uint256 public lastResetDay;
-
-    mapping(address => bool) public allowlistedTargets;
-    bool public emergencyStopped;
-
-    address public admin;
-
-    event TargetAllowlisted(address indexed target);
-    event TargetRemoved(address indexed target);
-    event SpendingCapUpdated(uint256 newCap);
-    event EmergencyStopped();
-    event EmergencyResumed();
-
-    error NotAdmin();
+contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor, ReentrancyGuard {
     error TargetNotAllowed();
     error SpendingCapExceeded();
-    error EmergencyStopActive();
+    error ContractPaused();
+    error InvalidTarget();
 
-    constructor(
-        address _agentSigner,
-        uint256 _initialSpendingCapPerDay
-    ) Pattern1_PlannerExecutor(_agentSigner) {
-        if (msg.sender == address(0)) revert InvalidAgentSigner();
-        if (_agentSigner == address(0)) revert InvalidAgentSigner();
-        admin = msg.sender;
-        spendingCapPerDay = _initialSpendingCapPerDay;
-        lastResetDay = block.timestamp / 1 days;
-    }
+    address public admin;
+    uint256 public spendingCapPerDay;
+    uint256 public dailySpent;
+    uint256 public lastSpendingResetDay;
+    bool public paused;
+
+    mapping(address => bool) public allowedTargets;
+
+    event TargetAdded(address indexed target);
+    event TargetRemoved(address indexed target);
+    event SpendingCapUpdated(uint256 newCap);
+    event SpendingRecorded(uint256 amount, uint256 dailySpent);
+    event EmergencyStop(bool status);
 
     modifier onlyAdmin() {
-        if (msg.sender != admin) revert NotAdmin();
+        require(msg.sender == admin, "Not admin");
         _;
     }
 
-    modifier notStopped() {
-        if (emergencyStopped) revert EmergencyStopActive();
-        _;
+    // Constructor: (signer, spendingCap) - admin is msg.sender
+    constructor(
+        address _agentSigner,
+        uint256 _spendingCapPerDay
+    ) Pattern1_PlannerExecutor(_agentSigner) {
+        admin = msg.sender;
+        spendingCapPerDay = _spendingCapPerDay;
+        lastSpendingResetDay = block.timestamp / 1 days;
     }
 
-    function addTarget(address _target) external onlyAdmin {
-        allowlistedTargets[_target] = true;
-        emit TargetAllowlisted(_target);
+    function addTarget(address target) external onlyAdmin {
+        if (target == address(0)) revert InvalidTarget();
+        allowedTargets[target] = true;
+        emit TargetAdded(target);
     }
 
-    function removeTarget(address _target) external onlyAdmin {
-        allowlistedTargets[_target] = false;
-        emit TargetRemoved(_target);
+    function removeTarget(address target) external onlyAdmin {
+        allowedTargets[target] = false;
+        emit TargetRemoved(target);
     }
 
     function setSpendingCap(uint256 _newCap) external onlyAdmin {
@@ -60,40 +55,30 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor {
         emit SpendingCapUpdated(_newCap);
     }
 
-    function emergencyStop() external onlyAdmin {
-        emergencyStopped = true;
-        emit EmergencyStopped();
+    function emergencyStop(bool _status) external onlyAdmin {
+        paused = _status;
+        emit EmergencyStop(_status);
     }
 
-    function resume() external onlyAdmin {
-        emergencyStopped = false;
-        emit EmergencyResumed();
+    // Override execute - must match Pattern1 visibility (public) and data location (memory)
+    function execute(Intent memory intent, bytes memory signature) public override nonReentrant {
+        if (paused) revert ContractPaused();
+        if (!allowedTargets[intent.target]) revert TargetNotAllowed();
+
+        uint256 currentDay = block.timestamp / 1 days;
+        if (currentDay > lastSpendingResetDay) {
+            dailySpent = 0;
+            lastSpendingResetDay = currentDay;
+        }
+
+        if (dailySpent + intent.value > spendingCapPerDay) {
+            revert SpendingCapExceeded();
+        }
+
+        dailySpent += intent.value;
+        emit SpendingRecorded(intent.value, dailySpent);
+
+        // Delegate to Pattern1
+        super.execute(intent, signature);
     }
-
-    // تغییر: calldata به memory
-
-function execute(
-    Intent memory intent,
-    bytes memory signature
-) public override notStopped {
-    if (!allowlistedTargets[intent.target]) revert TargetNotAllowed();
-
-    uint256 currentDay = block.timestamp / 1 days;
-
-    if (currentDay > lastResetDay) {
-        spentToday = 0;
-        lastResetDay = currentDay;
-    }
-
-    if (spentToday + intent.value > spendingCapPerDay) {
-        revert SpendingCapExceeded();
-    }
-
-    // ثبت هزینه قبل از فراخوانی خارجی
-    spentToday += intent.value;
-
-    // اجرای Intent پس از ثبت هزینه
-    super.execute(intent, signature);
-}
-
 }
