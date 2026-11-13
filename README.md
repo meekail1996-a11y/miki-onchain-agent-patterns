@@ -1,7 +1,7 @@
 
 # On-chain Agent Patterns
 
-[![Tests](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/actions/workflows/tests.yml/badge.svg)](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/actions/workflows/tests.yml)
+[![Tests](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/actions/workflows/tests.yml/badge.svg)](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/actions/workflows/tests.yml) [![Latest Release](https://img.shields.io/github/v/release/meekail1996-a11y/miki-onchain-agent-patterns)](https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases)
 
 **A learning-oriented reference project for constrained AI-agent interactions with smart contracts.**
 
