@@ -332,6 +332,51 @@ cd miki-onchain-agent-patterns
 git submodule update --init --recursive
 ```
 
+### Run it yourself
+
+From a fresh clone, this is everything needed to reproduce both suites. No keys,
+no network access and no deployment are required:
+
+```bash
+git submodule update --init --recursive
+forge test                                   # 60 Solidity tests
+python -m pip install -r requirements.txt    # first run only
+python -m unittest discover -s tests -v      # 7 Python tests
+```
+
+Expected tail of the Solidity run:
+
+```text
+Ran 6 test suites in 337.48ms (1.05s CPU time): 60 tests passed, 0 failed, 0 skipped (60 total tests)
+```
+
+Expected tail of the Python run:
+
+```text
+Ran 7 tests in 0.120s
+
+OK
+```
+
+What each suite is worth running for:
+
+| Command | What it pins |
+|---|---|
+| `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
+| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap |
+| `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
+| `python -m unittest discover -s tests -v` | EIP-712 digest parity between the Python signer and the Solidity contract |
+
+The signing script is interactive with the environment, not with a wallet prompt. If
+you run it unconfigured it fails fast instead of guessing:
+
+```text
+Configuration error: Missing required environment variable: PRIVATE_KEY
+```
+
+Set `PRIVATE_KEY`, `CHAIN_ID`, `CONTRACT_ADDRESS`, `TARGET_ADDRESS` and
+`INTENT_NONCE` (from the executor's public getter) to sign a test Intent.
+
 ### Run Solidity tests
 
 ```bash
