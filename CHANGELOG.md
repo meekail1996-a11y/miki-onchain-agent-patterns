@@ -8,6 +8,10 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [v0.1.3] - 2026-11-14
+
 ### Added
 
 - `SECURITY.md` security policy: project status, the private reporting channel via
@@ -97,7 +101,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.3...HEAD
+[v0.1.3]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.2...v0.1.3
 [v0.1.2]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.0
