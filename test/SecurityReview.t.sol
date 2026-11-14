@@ -754,4 +754,133 @@ contract SecurityReviewTest is Test {
         vm.expectRevert(Pattern1_PlannerExecutor.InvalidNonce.selector);
         arbitration.propose(intent, signature);
     }
+
+    // ------------------------------------- Pattern 2 day-boundary behaviour
+
+    function _boundedWithCap(
+        uint256 cap,
+        address target
+    ) internal returns (Pattern2_BoundedAutonomy bounded) {
+        bounded = new Pattern2_BoundedAutonomy(signer, cap);
+        vm.deal(address(bounded), 20 ether);
+        bounded.addTarget(target);
+    }
+
+    /// One second before the boundary still counts against the same day; the reset
+    /// happens exactly when the timestamp crosses into the next day.
+    function test_CapStillAppliesOneSecondBeforeDayBoundary() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+
+        vm.warp(86_399);
+
+        Pattern1_PlannerExecutor.Intent memory first = _intent(
+            address(target),
+            0.75 ether,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(first, _sign(address(bounded), first));
+        assertEq(bounded.dailySpent(), 0.75 ether, "spent on day zero");
+
+        Pattern1_PlannerExecutor.Intent memory tooMuch = _intent(
+            address(target),
+            0.5 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        vm.expectRevert(Pattern2_BoundedAutonomy.SpendingCapExceeded.selector);
+        bounded.execute(tooMuch, _sign(address(bounded), tooMuch));
+
+        vm.warp(86_400);
+        Pattern1_PlannerExecutor.Intent memory afterReset = _intent(
+            address(target),
+            0.5 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(afterReset, _sign(address(bounded), afterReset));
+
+        assertEq(bounded.dailySpent(), 0.5 ether, "counter restarted for the new day");
+        assertEq(bounded.lastSpendingResetDay(), 1, "day index advanced");
+    }
+
+    /// Idle days do not accumulate allowance: the counter resets to the current day
+    /// and the cap applies once per day, not once per idle day.
+    function test_DayResetDoesNotAccumulateAcrossIdleDays() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+
+        vm.warp(2_000);
+        Pattern1_PlannerExecutor.Intent memory early = _intent(
+            address(target),
+            0.4 ether,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(early, _sign(address(bounded), early));
+
+        vm.warp(1_000 + 5 * 1 days);
+
+        Pattern1_PlannerExecutor.Intent memory later = _intent(
+            address(target),
+            0.9 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(later, _sign(address(bounded), later));
+
+        assertEq(bounded.dailySpent(), 0.9 ether, "only today's spend is counted");
+
+        // Deployed at t=1000 (day 0); five days later the timestamp sits in day 5.
+        uint256 expectedDay = 5;
+        assertEq(
+            bounded.lastSpendingResetDay(),
+            expectedDay,
+            "reset target is the current day, not an accumulation"
+        );
+    }
+
+    /// The cap is per calendar day, so spending the whole cap just before midnight and
+    /// again just after is allowed. This pins the documented consequence rather than
+    /// leaving it implicit.
+    function test_BoundaryStraddleAllowsTwoCapsCloseTogether() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+
+        vm.warp(86_399);
+        Pattern1_PlannerExecutor.Intent memory beforeMidnight = _intent(
+            address(target),
+            1 ether,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(beforeMidnight, _sign(address(bounded), beforeMidnight));
+        assertEq(bounded.dailySpent(), 1 ether, "cap fully used on day zero");
+
+        vm.warp(86_400);
+        Pattern1_PlannerExecutor.Intent memory afterMidnight = _intent(
+            address(target),
+            1 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(afterMidnight, _sign(address(bounded), afterMidnight));
+
+        assertEq(address(target).balance, 2 ether, "2x the cap moved within one second");
+        assertEq(bounded.dailySpent(), 1 ether, "day one is back at its own cap");
+    }
 }
