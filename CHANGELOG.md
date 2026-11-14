@@ -8,14 +8,31 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
-## [v0.1.2] - 2026-11-14
-
 ### Added
 
 - `SECURITY.md` security policy: project status, the private reporting channel via
   GitHub Security Advisories, what a useful report must contain, in/out-of-scope
   boundaries, response expectations and safe-harbour terms. Private vulnerability
   reporting is enabled on the repository, with a link from the README.
+- README: a constrained treasury payment case study, and a section explaining what
+  a signed Intent does and does not prove.
+
+### Changed
+
+- `admin` (Pattern 2) and `arbiter` (Pattern 3) are now `immutable`, removing
+  administrative reassignment entirely; the residual key-loss risk is documented.
+- Solidity is pinned to `0.8.38` with `evm_version = "shanghai"`.
+
+### Fixed
+
+- `docs/security.md` had been truncated mid-sentence; the Pattern 3 nonce policy,
+  known limitations, storage/upgradeability notes, operational recommendations and
+  the security status section are restored.
+
+## [v0.1.2] - 2026-11-14
+
+### Added
+
 - `test/SecurityReview.t.sol`: tests pinning guarantees that were documented but not
   previously exercised — malleable (high-`s`) signature rejection, cross-chain replay
   rejection, the inclusive deadline boundary, recovery from a proposal that expires
@@ -79,7 +96,7 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.2...HEAD
 [v0.1.2]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.0

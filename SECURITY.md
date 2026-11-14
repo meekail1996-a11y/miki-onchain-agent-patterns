@@ -17,13 +17,14 @@ starting point that still needs your own review, hardening and audit.
 
 | Version | Supported |
 | ------- | --------- |
-| `v0.1.1` (latest tag) | Yes |
-| `v0.1.0` | No — superseded |
+| Latest tagged release on `main` (see the Releases page) | Yes |
+| Any earlier tag or release | No — superseded |
 | Older commits, forks, and local modifications | No |
 
-Only the latest tagged release on `main` receives fixes. Because the contracts
-are not proxy-upgrade compatible, a fix ships as a new deployment, not as an
-upgrade to an existing one.
+Only the most recent tag on `main` receives fixes; this table is deliberately not
+pinned to a version number, so it cannot go stale between releases. Because the
+contracts are not proxy-upgrade compatible, a fix ships as a new deployment, not
+as an upgrade to an existing one.
 
 ## Reporting a vulnerability
 

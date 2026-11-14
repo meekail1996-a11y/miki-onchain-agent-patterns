@@ -52,9 +52,9 @@ Residual risks that these controls do not remove are listed under each pattern's
 
 - Anyone holding a valid signed Intent may submit it for execution. The relayer is not bound to the signature.
 - A compromised signer key can authorize malicious Intents.
+- Long deadlines increase the time window in which a signed Intent may be submitted.
 - A valid signature confirms that the authorized signer approved the exact target, value, and calldata; it does not establish that the target or the requested operation is safe.
 - Pattern 1 permits calls to arbitrary target addresses and does not include Pattern 2's target allowlist or daily native-asset spending cap. This creates an arbitrary-ETH-transfer risk if the signer key is compromised or authorizes an unsafe Intent.
-- Long deadlines increase the time window in which a signed Intent may be submitted.
 
 ## Pattern 2 — Bounded Autonomy
 
@@ -70,7 +70,7 @@ Residual risks that these controls do not remove are listed under each pattern's
 ### Known Limitations
 
 - The daily spending cap accounts for `intent.value` only. It does not track ERC-20 transfers or other token exposure.
-- Administrative authority is centralized. The current implementation does not require a multisig or timelock.
+- Administrative authority is centralized and the `admin` address is `immutable`: no multisig or timelock is required, and losing the admin key permanently loses administrative control (pause, allowlist, and spending-cap changes).
 - The target allowlist restricts which contracts can be called, but does not validate the safety of individual functions or calldata sent to an allowed contract.
 - Reentrancy-focused tests cover specific attack scenarios; they do not prove that all possible reentrancy vulnerabilities have been eliminated.
 - Further adversarial testing and independent security review are necessary.
@@ -94,4 +94,67 @@ Residual risks that these controls do not remove are listed under each pattern's
 ### Voter Eligibility and Quorum
 
 - Each agent records the proposal index at which it was admitted. An agent may vote on a proposal only if it was admitted no later than that proposal's creation.
-- Quorum is a strict majority of the agents registered at proposal creation time: `agentCount /
+- Quorum is a strict majority of the agents registered at proposal creation time: `agentCount / 2 + 1`, stored per proposal and never recomputed.
+- Removing an agent blocks its future votes but does not retract votes it already cast, and does not change any existing proposal's quorum.
+- Re-admission grants fresh eligibility only: a re-admitted agent cannot vote on proposals created before it was re-admitted, including proposals created before its earlier removal.
+
+### Nonce Policy
+
+- `propose` rejects Intents whose nonce is below the executor's current nonce, and rejects a nonce already reserved by a live proposal.
+- Proposals for future nonces may be queued. They become executable only once the executor nonce reaches them; until then `resolveArbitration` reverts with `InvalidNonce` and the proposal stays pending.
+- A terminal rejection releases the nonce reservation so a different Intent can use it. An executed proposal advances the nonce permanently.
+
+### Known Limitations
+
+- The arbiter controls agent membership. Because the arbiter can register agents it controls, quorum only constrains an arbiter whose agents are genuinely independent. Separating agent admission from arbitration is not implemented.
+- The arbiter retains decisive authority over proposal outcomes and has no enforced timeout or automatic escalation.
+- There is no quorum-independent fallback: if agents stop voting, nothing executes.
+- Pattern 3 implements neither a target allowlist nor a native-asset spending cap. A quorum-approved Intent may call any non-zero address with an arbitrary `value`. Those controls exist only in Pattern 2.
+- Quorum is immutable per proposal, so removing agents can make an existing proposal permanently unable to reach its threshold. Such a proposal can only be closed by an explicit rejection.
+- Votes cast before an agent was removed continue to count. Retracting them would let an arbiter erase rejections and change outcomes, so the current behaviour is deliberately conservative.
+- An agent holding a valid signed Intent can reserve the current nonce with it and then abstain, stalling new proposals until the arbiter rejects that proposal. Signature validation prevents unsigned reservations but cannot prevent squatting with a genuine signature.
+- The `arbiter` address is `immutable`, so rotation and recovery are not possible without a new deployment. A lost arbiter key freezes every proposal permanently, including the rejection path used to release reserved nonces.
+- Agent registration and voting do not independently guarantee that proposals are correct or safe.
+- The implementation should not be considered decentralized consensus.
+
+### Storage Layout and Upgradeability
+
+- The Pattern 3 storage layout changed when quorum, eligibility epochs, nonce reservations, and the proposal status enum were introduced; `Proposal.executed` was replaced by `Proposal.status`, and new state variables were added.
+- Patterns 1-3 are designed for fresh deployments. They are **not** proxy-storage compatible: upgrading an existing proxy to these versions would misalign storage slots.
+- If upgradeability is required, the storage layout must be designed and frozen separately, and the contracts re-reviewed for upgrade safety.
+
+## Operational Security Recommendations
+
+- Never commit private keys, seed phrases, API keys, or other secrets to the repository.
+- Use dedicated test accounts for local development and testing.
+- Use short Intent deadlines where practical.
+- Verify the chain ID, signer, executor address, target address, nonce, and value before signing or submitting an Intent.
+- Review target contracts and their callable functions before adding them to an allowlist.
+- Deploy Pattern 3 with a multisig or timelock as the arbiter, since arbiter rotation is not implemented.
+- Monitor execution events and administrative changes.
+- Keep administrative credentials secure and consider multisig and timelock controls before any real-world deployment.
+- Do not use real funds without independent security review and appropriate hardening.
+
+## Security Status
+
+This repository is an educational and experimental project.
+
+- It has not undergone an independent professional security audit.
+- It is not production-ready.
+- `test/SecurityReview.t.sol` pins the guarantees that are easy to regress: rejection of malleable (high-`s`) signatures, rejection of signatures bound to another chain, the inclusive deadline boundary, release of a nonce reserved by a proposal that expired before resolution, the arbiter-dependent liveness of a squatted nonce, blocked votes from removed agents, and token transfers escaping the native spending cap.
+- Passing automated tests does not guarantee the absence of vulnerabilities.
+- The documented controls reduce specific risks but do not eliminate all smart contract, key-management, operational, or integration risks.
+
+## Future Security Improvements
+
+Potential improvements include:
+
+- Multisig and timelock-based administration.
+- An arbiter-transfer mechanism, so a lost arbiter key does not freeze governance; this needs a redesign because the arbiter is immutable today.
+- A separate agent-admission role, so quorum cannot be minted by the approving arbiter.
+- Explicit expiry or timeout handling for proposals that can no longer reach quorum.
+- Stronger configuration validation.
+- Expanded threat modeling.
+- Additional adversarial and invariant testing.
+- Improved monitoring and operational safeguards.
+- Stronger governance and authorization boundaries.
