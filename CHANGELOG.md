@@ -8,6 +8,29 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [v0.1.4] - 2026-11-14
+
+Coverage and documentation alignment pass. No contract behaviour changed.
+
+### Added
+
+- `test/SecurityReview.t.sol`: seven further scenarios — direct `receive()` funding of
+  the executor, a negative vote recorded as a rejection, resolving an already-executed
+  proposal, resolving a rejected proposal, and zero-address guards for `agentSigner`,
+  allowlist targets and `arbiter`.
+- `docs/security.md`: a static analysis section recording the six Slither detector
+  classes, each with an assessment and its residual risk, plus the current
+  `forge coverage` figures.
+
+### Changed
+
+- README and `docs/security.md` now describe the `admin` and `arbiter` roles as
+  `immutable`, matching the contracts; the roadmap item for arbiter transfer is marked
+  as requiring a redesign.
+- `.gitignore` ignores `lcov.info`, so coverage output cannot leak into commits.
+
 ### Fixed
 
 - `docs/patterns.md` claimed Pattern 3 "does not enforce a voting quorum"; it does
@@ -108,7 +131,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.4...HEAD
+[v0.1.4]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.3...v0.1.4
 [v0.1.3]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.2...v0.1.3
 [v0.1.2]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.1
