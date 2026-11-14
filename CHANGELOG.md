@@ -12,6 +12,10 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ### Added
 
+- `SECURITY.md` security policy: project status, the private reporting channel via
+  GitHub Security Advisories, what a useful report must contain, in/out-of-scope
+  boundaries, response expectations and safe-harbour terms. Private vulnerability
+  reporting is enabled on the repository, with a link from the README.
 - `test/SecurityReview.t.sol`: tests pinning guarantees that were documented but not
   previously exercised — malleable (high-`s`) signature rejection, cross-chain replay
   rejection, the inclusive deadline boundary, recovery from a proposal that expires
