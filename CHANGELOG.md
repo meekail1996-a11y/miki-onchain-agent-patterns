@@ -10,6 +10,22 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 Nothing yet.
 
+## [v0.1.1] - 2026-11-14
+
+Documentation and release-automation follow-up. No contract or signer behaviour changed.
+
+### Added
+
+- `CHANGELOG.md` following Keep a Changelog, seeded with the v0.1.0 entry.
+- Latest-release badge in the README header and a changelog link in the navigation.
+- `release.yml` workflow that publishes a GitHub release from the matching changelog
+  section when a `v*` tag is pushed, and skips tags that already have a release.
+
+### Fixed
+
+- Release-note extraction matches the changelog heading with `index()` instead of a
+  backslash-escaped regex, so it no longer depends on shell and YAML escaping.
+
 ## [v0.1.0] - 2026-11-13
 
 First tagged, presentable version of the reference implementation.
@@ -49,5 +65,6 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...HEAD
+[v0.1.1]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.0
