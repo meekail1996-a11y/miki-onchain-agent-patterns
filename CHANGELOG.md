@@ -14,6 +14,10 @@ While the project is at `0.x`, breaking changes may land in minor versions.
   despite a cast rejection, a queued future-nonce proposal that executes once the
   executor nonce catches up, and a replay of an already executed Intent rejected by
   the nonce.
+- `test/SecurityReview.t.sol`: day-boundary cases for the Pattern 2 cap — the cap still
+  applies one second before midnight, the reset happens exactly at the boundary, idle
+  days do not accumulate allowance, and a midnight straddle can move twice the cap
+  within seconds (documented consequence).
 - `scripts/test_release_workflow.sh`: a harness that extracts the publish step from
   `.github/workflows/release.yml` and runs it against a stubbed `gh` for four cases —
   a matching changelog section, a missing section, a missing `CHANGELOG.md`, and a

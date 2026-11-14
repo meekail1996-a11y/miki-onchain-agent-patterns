@@ -70,6 +70,7 @@ Residual risks that these controls do not remove are listed under each pattern's
 ### Known Limitations
 
 - The daily spending cap accounts for `intent.value` only. It does not track ERC-20 transfers or other token exposure.
+- The cap is per calendar day (UTC) and resets on the first transaction of a new day. Spending the full cap just before midnight and again just after therefore permits up to twice the cap within seconds, while idle days do not accumulate allowance. `test/SecurityReview.t.sol` pins both edges.
 - Administrative authority is centralized and the `admin` address is `immutable`: no multisig or timelock is required, and losing the admin key permanently loses administrative control (pause, allowlist, and spending-cap changes).
 - The target allowlist restricts which contracts can be called, but does not validate the safety of individual functions or calldata sent to an allowed contract.
 - Reentrancy-focused tests cover specific attack scenarios; they do not prove that all possible reentrancy vulnerabilities have been eliminated.

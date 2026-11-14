@@ -347,7 +347,7 @@ python -m unittest discover -s tests -v      # 7 Python tests
 Expected tail of the Solidity run:
 
 ```text
-Ran 6 test suites in 337.48ms (1.05s CPU time): 60 tests passed, 0 failed, 0 skipped (60 total tests)
+Ran 6 test suites in 503.15ms (1.42s CPU time): 73 tests passed, 0 failed, 0 skipped (73 total tests)
 ```
 
 Expected tail of the Python run:
@@ -363,7 +363,7 @@ What each suite is worth running for:
 | Command | What it pins |
 |---|---|
 | `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
-| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap |
+| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
 | `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
 | `python -m unittest discover -s tests -v` | EIP-712 digest parity between the Python signer and the Solidity contract |
 
