@@ -8,7 +8,14 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- `docs/patterns.md` claimed Pattern 3 "does not enforce a voting quorum"; it does
+  (approval reverts with `InsufficientVotes` below the stored quorum). The document
+  now also covers per-proposal eligibility, nonce reservation, terminal rejection,
+  disabled direct execution and the immutable `admin`/`arbiter` roles.
+- `SECURITY.md` pointed at a Python signer "under `tests/`"; it lives in
+  `scripts/sign_intent.py`, while `tests/` holds the Python test suite.
 
 ## [v0.1.3] - 2026-11-14
 

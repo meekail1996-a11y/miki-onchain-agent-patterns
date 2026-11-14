@@ -62,7 +62,7 @@ people's data.
 **In scope**
 
 - `contracts/*.sol` — the three reference implementations.
-- `scripts/` and the Python signer under `tests/`.
+- `scripts/sign_intent.py` and the Python test suite under `tests/`.
 - The GitHub Actions workflows in `.github/workflows/`.
 
 **Out of scope**

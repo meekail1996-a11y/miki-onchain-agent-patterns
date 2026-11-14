@@ -113,7 +113,7 @@ A targeted adversarial test checks an attempt to bypass the daily cap through re
 **Limitations:**
 
 - The daily cap tracks native currency represented by `intent.value`; it does not account for ERC-20 transfers or other token exposure.
-- Administration is centralized in a single admin address.
+- Administration is centralized in a single `immutable` admin address; there is no transfer or renounce path, so losing the key permanently loses administrative control.
 - Multisig administration and timelocked changes are not implemented.
 - The allowlist restricts destination addresses but does not validate the safety of individual functions or calldata.
 - The reentrancy test covers specific attack scenarios, not every possible vulnerability.
@@ -165,7 +165,7 @@ The signer authorizes the Intent using an EIP-712 signature. Registered agents p
 - Rejection votes do not trigger automatic rejection.
 - The quorum is fixed at proposal creation; removing agents does not lower it.
 - A proposal may become difficult or impossible to approve if its quorum can no longer be reached.
-- The arbiter is configured at deployment; arbiter rotation is not implemented.
+- The `arbiter` is `immutable`: it is fixed at deployment and cannot be rotated, so a lost arbiter key freezes governance until redeployment.
 - Multisig arbitration and timelocked arbitration are not implemented.
 - There is no target allowlist or daily spending cap in Pattern 3.
 - The pattern demonstrates controlled arbitration, not decentralized consensus.
@@ -334,8 +334,8 @@ git submodule update --init --recursive
 
 ### Run it yourself
 
-From a fresh clone, this is everything needed to reproduce both suites. No keys,
-no network access and no deployment are required:
+From a fresh clone, this is everything needed to reproduce both suites. No keys and
+no deployment are required; only the first dependency install needs network access:
 
 ```bash
 git submodule update --init --recursive
@@ -436,7 +436,7 @@ Passing tests demonstrate that the tested scenarios behave as expected. They do 
 ### Planned
 
 - [ ] Multisig or timelocked administrative controls.
-- [ ] Two-step arbiter rotation, so a lost arbiter key cannot freeze governance.
+- [ ] An arbiter-transfer mechanism, so a lost arbiter key cannot freeze governance; this needs a redesign because `arbiter` is `immutable` today.
 - [ ] A separate agent-admission role for Pattern 3.
 - [ ] More flexible target and function-level policies.
 - [ ] ERC-20 spending limits.
