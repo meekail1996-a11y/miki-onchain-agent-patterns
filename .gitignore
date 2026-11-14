@@ -5,6 +5,9 @@ broadcast/
 __pycache__/
 *.pyc
 
+# Coverage output
+lcov.info
+
 # Local secrets and environment files
 .env
 .env.*

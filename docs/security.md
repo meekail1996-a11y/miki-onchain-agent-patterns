@@ -123,6 +123,23 @@ Residual risks that these controls do not remove are listed under each pattern's
 - Patterns 1-3 are designed for fresh deployments. They are **not** proxy-storage compatible: upgrading an existing proxy to these versions would misalign storage slots.
 - If upgradeability is required, the storage layout must be designed and frozen separately, and the contracts re-reviewed for upgrade safety.
 
+## Static Analysis Findings
+
+Slither 0.11.6 was run against the three contracts (forge 1.9.0, solc 0.8.38 as pinned in `foundry.toml`). Six detector classes fired. None of them is an unmitigated code defect; each is recorded here so a reviewer does not have to re-derive the reasoning.
+
+| Detector | Location | Assessment |
+|---|---|---|
+| `arbitrary-send-eth` | `Pattern1_PlannerExecutor._executeIntent` | By design. The executor forwards `intent.value` and `intent.data` to `intent.target` on behalf of the signer. The only gate is the signature; the target is not constrained by Pattern 1. Mitigations belong above it: Pattern 2's allowlist and daily cap, or Pattern 3's quorum and arbiter. Deploying Pattern 1 alone means a compromised signer key can drain the contract balance to any address. |
+| `low-level-calls` | `Pattern1_PlannerExecutor._executeIntent` | Same call, reported separately. The low-level `call` is the execution mechanism; its success flag is checked and a failure reverts with `CallFailed`, but the revert reason of the callee is discarded. |
+| `timestamp` | deadline checks in all three contracts; `currentDay > lastSpendingResetDay` in Pattern 2 | Accepted with a bounded effect, not treated as risk-free. Block timestamps are set by block producers and can be shifted within the tolerance of the target chain (seconds on most L1s, but sequencer-controlled and possibly coarser on some L2s). It affects two things: an Intent near its deadline may be accepted or rejected a few seconds early or late, and a payment near a day boundary may be counted against the previous or the next day's cap. It cannot raise the cap itself, and on chains with coarse timestamps the window is wider than on Ethereum. |
+| `unused-return` | `EIP712`/`ECDSA` `tryRecover` in `_verifyIntentSignature` | Deliberate. In OpenZeppelin 5.0.2 the third return value is `errorArg`, which OZ only forwards into its own typed errors (for example `ECDSAInvalidSignatureLength`). This contract collapses every recovery failure into a single `InvalidSignature()`, so the argument is intentionally discarded and no failure detail is exposed to callers. |
+| `solc-version` | `pragma solidity ^0.8.20` in all three contracts | Known advisory surface, not currently exploitable in this repository. Builds pin `solc_version = "0.8.38"` in `foundry.toml` and CI compiles with that version. The constraint itself still permits older 0.8.x compilers that carry the flagged bugs (`VerbatimInvalidDeduplication`, `FullInlinerNonExpressionSplitArgumentEvaluationOrder`, `MissingSideEffectsOnSelectorAccess`), so anyone building with a different toolchain should pin a recent compiler. Tightening the pragma was considered and deliberately deferred. |
+| `naming-convention` | contract and parameter names | Style only. `Pattern1_PlannerExecutor` and the `_param` argument prefixes are chosen for readability of the patterns. |
+
+### Test Coverage
+
+`forge coverage` over the current suite reports 93.98% of lines, 90.79% of statements, 83.78% of branches and 92.31% of functions. Every line of the three contracts is executed by at least one test; the remaining gaps are in test helper code. Coverage is a coverage metric, not a security guarantee.
+
 ## Operational Security Recommendations
 
 - Never commit private keys, seed phrases, API keys, or other secrets to the repository.
