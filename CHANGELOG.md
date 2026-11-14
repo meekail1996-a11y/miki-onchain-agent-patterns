@@ -8,6 +8,8 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+## [v0.1.2] - 2026-11-14
+
 ### Added
 
 - `test/SecurityReview.t.sol`: tests pinning guarantees that were documented but not
@@ -74,5 +76,6 @@ First tagged, presentable version of the reference implementation.
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
 [Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...HEAD
+[v0.1.2]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.0
