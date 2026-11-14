@@ -10,7 +10,7 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor, ReentrancyGuard {
     error ContractPaused();
     error InvalidTarget();
 
-    address public admin;
+    address public immutable admin;
     uint256 public spendingCapPerDay;
     uint256 public dailySpent;
     uint256 public lastSpendingResetDay;
@@ -55,9 +55,9 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor, ReentrancyGuard {
         emit SpendingCapUpdated(_newCap);
     }
 
-    function emergencyStop(bool _status) external onlyAdmin {
-        paused = _status;
-        emit EmergencyStop(_status);
+    function emergencyStop(bool stopped) external onlyAdmin {
+        paused = stopped;
+        emit EmergencyStop(stopped);
     }
 
     // Override execute - must match Pattern1 visibility (public) and data location (memory)

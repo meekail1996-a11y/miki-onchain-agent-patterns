@@ -19,7 +19,7 @@ contract Pattern3_MultiAgentArbitration is
     mapping(address => uint256) public agentEpoch;
 
     uint256 public agentCount;
-    address public arbiter;
+    address public immutable arbiter;
 
     mapping(uint256 => bool) public nonceReserved;
 
@@ -176,7 +176,7 @@ contract Pattern3_MultiAgentArbitration is
     function resolveArbitration(
         uint256 _proposalId,
         bool _approve
-    ) external onlyArbiter nonReentrant {
+    ) external nonReentrant onlyArbiter {
         if (_proposalId >= proposalCount) revert InvalidProposal();
 
         Proposal storage p = proposals[_proposalId];
