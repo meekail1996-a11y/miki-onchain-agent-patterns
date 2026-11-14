@@ -10,6 +10,10 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ### Added
 
+- `test/SecurityReview.t.sol`: combined-state cases — a proposal that reaches quorum
+  despite a cast rejection, a queued future-nonce proposal that executes once the
+  executor nonce catches up, and a replay of an already executed Intent rejected by
+  the nonce.
 - `scripts/test_release_workflow.sh`: a harness that extracts the publish step from
   `.github/workflows/release.yml` and runs it against a stubbed `gh` for four cases —
   a matching changelog section, a missing section, a missing `CHANGELOG.md`, and a

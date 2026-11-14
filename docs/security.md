@@ -101,7 +101,7 @@ Residual risks that these controls do not remove are listed under each pattern's
 ### Nonce Policy
 
 - `propose` rejects Intents whose nonce is below the executor's current nonce, and rejects a nonce already reserved by a live proposal.
-- Proposals for future nonces may be queued. They become executable only once the executor nonce reaches them; until then `resolveArbitration` reverts with `InvalidNonce` and the proposal stays pending.
+- Proposals for future nonces may be queued. They become executable only once the executor nonce reaches them; until then `resolveArbitration` reverts with `InvalidNonce` and the proposal stays pending. Quorum is checked before the nonce, so a queued proposal that has not reached quorum reports `InsufficientVotes` instead.
 - A terminal rejection releases the nonce reservation so a different Intent can use it. An executed proposal advances the nonce permanently.
 
 ### Known Limitations
