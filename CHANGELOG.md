@@ -14,8 +14,9 @@ While the project is at `0.x`, breaking changes may land in minor versions.
   GitHub Security Advisories, what a useful report must contain, in/out-of-scope
   boundaries, response expectations and safe-harbour terms. Private vulnerability
   reporting is enabled on the repository, with a link from the README.
-- README: a constrained treasury payment case study, and a section explaining what
-  a signed Intent does and does not prove.
+- README: a constrained treasury payment case study, a section explaining what a
+  signed Intent does and does not prove, and a one-block "Run it yourself" path
+  with the expected output of both test suites.
 
 ### Changed
 
