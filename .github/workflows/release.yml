@@ -27,19 +27,22 @@ jobs:
             exit 0
           fi
 
-          notes="$RUNNER_TEMP/release-notes.md"
-          if [ -f CHANGELOG.md ]; then
-            awk -v v="$VERSION" '
-              index($0, "## [" v "]") == 1 { inside = 1; next }
-              inside && index($0, "## [") == 1 { exit }
-              inside && substr($0, 1, 1) == "[" && index($0, "]:") > 0 { exit }
-              inside { print }
-            ' CHANGELOG.md > "$notes"
+          if [ ! -f CHANGELOG.md ]; then
+            echo "::error::CHANGELOG.md not found; cannot build release notes." >&2
+            exit 1
           fi
 
+          notes="$RUNNER_TEMP/release-notes.md"
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { inside = 1; next }
+            inside && index($0, "## [") == 1 { exit }
+            inside && substr($0, 1, 1) == "[" && index($0, "]:") > 0 { exit }
+            inside { print }
+          ' CHANGELOG.md > "$notes"
+
           if [ ! -s "$notes" ]; then
-            echo "No CHANGELOG.md section for $VERSION; using a fallback note." >&2
-            printf 'See CHANGELOG.md for details.\n' > "$notes"
+            echo "::error::CHANGELOG.md has no section for $VERSION (expected a heading like '## [$VERSION] - YYYY-MM-DD'). Refusing to publish a release without notes." >&2
+            exit 1
           fi
 
           gh release create "$VERSION" \
