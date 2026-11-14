@@ -395,4 +395,190 @@ contract SecurityReviewTest is Test {
         vm.expectRevert(Pattern3_MultiAgentArbitration.NotAgent.selector);
         arbitration.vote(proposalId, true);
     }
+
+    // ------------------------------------------- coverage-gap scenarios
+
+    /// Scenario 1: the executor accepts direct funding. `receive` exists because
+    /// Intents may carry native value, so a deployment has to be funded somehow.
+    function test_ReceiveAcceptsDirectFunding() public {
+        Pattern1_PlannerExecutor executor = new Pattern1_PlannerExecutor(signer);
+
+        vm.deal(address(this), 1 ether);
+        assertEq(address(executor).balance, 0, "starts empty");
+
+        (bool ok, ) = address(executor).call{value: 1 ether}("");
+
+        assertTrue(ok, "direct transfer must succeed");
+        assertEq(address(executor).balance, 1 ether, "executor is funded");
+    }
+
+    /// Scenario 2: a negative vote is recorded as a rejection, not as an approval.
+    function test_RejectionVoteIncrementsRejections() public {
+        (
+            Pattern3_MultiAgentArbitration arbitration,
+            address arbiter
+        ) = _deployArbitration();
+
+        address voter = makeAddr("negativeVoter");
+        vm.prank(arbiter);
+        arbitration.addAgent(voter);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(target),
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        vm.prank(voter);
+        uint256 proposalId = arbitration.propose(
+            intent,
+            _sign(address(arbitration), intent)
+        );
+
+        vm.prank(voter);
+        arbitration.vote(proposalId, false);
+
+        (
+            ,
+            ,
+            ,
+            uint256 approvals,
+            uint256 rejections,
+            uint256 quorum,
+
+        ) = arbitration.proposals(proposalId);
+
+        assertEq(approvals, 0, "no approval recorded");
+        assertEq(rejections, 1, "the negative vote is a rejection");
+        assertEq(quorum, 1, "quorum is unaffected by votes");
+    }
+
+    /// Scenario 3: an executed proposal cannot be resolved a second time, so a
+    /// single approval can never execute the same Intent twice.
+    function test_RevertWhenResolvingExecutedProposal() public {
+        (
+            Pattern3_MultiAgentArbitration arbitration,
+            address arbiter
+        ) = _deployArbitration();
+
+        address agent = makeAddr("agent");
+        vm.prank(arbiter);
+        arbitration.addAgent(agent);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(target),
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        vm.prank(agent);
+        uint256 proposalId = arbitration.propose(
+            intent,
+            _sign(address(arbitration), intent)
+        );
+
+        address[] memory agents = new address[](1);
+        agents[0] = agent;
+        _voteToQuorum(arbitration, proposalId, agents);
+
+        vm.prank(arbiter);
+        arbitration.resolveArbitration(proposalId, true);
+
+        vm.prank(arbiter);
+        vm.expectRevert(
+            Pattern3_MultiAgentArbitration.ProposalAlreadyExecuted.selector
+        );
+        arbitration.resolveArbitration(proposalId, true);
+
+        assertEq(target.calls(), 1, "executed exactly once");
+    }
+
+    /// Scenario 4: rejection is terminal for the arbiter too, not only for voters.
+    function test_RevertWhenResolvingRejectedProposal() public {
+        (
+            Pattern3_MultiAgentArbitration arbitration,
+            address arbiter
+        ) = _deployArbitration();
+
+        address agent = makeAddr("agent");
+        vm.prank(arbiter);
+        arbitration.addAgent(agent);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(target),
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        vm.prank(agent);
+        uint256 proposalId = arbitration.propose(
+            intent,
+            _sign(address(arbitration), intent)
+        );
+
+        vm.prank(arbiter);
+        arbitration.resolveArbitration(proposalId, false);
+
+        vm.prank(arbiter);
+        vm.expectRevert(
+            Pattern3_MultiAgentArbitration.ProposalNotPending.selector
+        );
+        arbitration.resolveArbitration(proposalId, true);
+
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            Pattern3_MultiAgentArbitration.ProposalStatus status
+        ) = arbitration.proposals(proposalId);
+
+        assertEq(
+            uint256(status),
+            uint256(Pattern3_MultiAgentArbitration.ProposalStatus.Rejected),
+            "rejection stays terminal after the failed resolve"
+        );
+        assertEq(target.calls(), 0, "rejected intent never executed");
+        assertEq(arbitration.nonce(), 0, "executor nonce never advanced");
+        assertFalse(arbitration.nonceReserved(0), "nonce stayed released");
+    }
+
+    /// Scenario 5: a zero-address signer would make every signature invalid while
+    /// failing open in reviews, so the constructor rejects it.
+    function test_RevertWhenAgentSignerIsZero() public {
+        vm.expectRevert(Pattern1_PlannerExecutor.InvalidAgentSigner.selector);
+        new Pattern1_PlannerExecutor(address(0));
+    }
+
+    /// Scenario 6: adding the zero address to the allowlist would authorise a
+    /// target that cannot receive a meaningful call.
+    function test_RevertWhenAddingZeroAddressTarget() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(
+            signer,
+            1 ether
+        );
+
+        vm.expectRevert(Pattern2_BoundedAutonomy.InvalidTarget.selector);
+        bounded.addTarget(address(0));
+    }
+
+    /// Scenario 7: without an arbiter nobody can resolve a proposal, so a
+    /// zero-address arbiter is rejected at deployment.
+    function test_RevertWhenArbiterIsZero() public {
+        vm.expectRevert(
+            Pattern3_MultiAgentArbitration.InvalidArbiter.selector
+        );
+        new Pattern3_MultiAgentArbitration(signer, address(0));
+    }
 }
