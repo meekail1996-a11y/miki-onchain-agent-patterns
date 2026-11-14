@@ -10,6 +10,15 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 Nothing yet.
 
+## [v0.1.5] - 2026-11-14
+
+### Changed
+
+- The `Release` workflow now fails when `CHANGELOG.md` is missing, or when it has no
+  section for the pushed tag, instead of publishing a release with a placeholder
+  note. The failure is reported as a `::error::` annotation and no release is
+  created, so a missing version entry cannot slip out silently.
+
 ## [v0.1.4] - 2026-11-14
 
 Coverage and documentation alignment pass. No contract behaviour changed.
@@ -131,7 +140,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.5...HEAD
+[v0.1.5]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.4...v0.1.5
 [v0.1.4]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.3...v0.1.4
 [v0.1.3]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.2...v0.1.3
 [v0.1.2]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.1...v0.1.2
