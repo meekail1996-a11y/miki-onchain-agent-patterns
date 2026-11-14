@@ -355,7 +355,7 @@ python -m unittest discover -s tests -v      # 7 Python tests
 Expected tail of the Solidity run:
 
 ```text
-Ran 6 test suites in 503.15ms (1.42s CPU time): 73 tests passed, 0 failed, 0 skipped (73 total tests)
+Ran 7 test suites in 588.13ms (1.42s CPU time): 81 tests passed, 0 failed, 0 skipped (81 total tests)
 ```
 
 Expected tail of the Python run:
@@ -373,6 +373,7 @@ What each suite is worth running for:
 | `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
 | `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
 | `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
+| `forge test --match-path test/AttackComparison.t.sol` | the same stolen-key attack against all three patterns: Pattern 1 drains at once, Pattern 2 is held to the cap and then drained over days, Pattern 3 needs a second agent |
 | `python -m unittest discover -s tests -v` | EIP-712 digest parity between the Python signer and the Solidity contract |
 
 The signing script is interactive with the environment, not with a wallet prompt. If
@@ -441,6 +442,18 @@ Two targeted mutations were applied to `contracts/Pattern2_BoundedAutonomy.sol` 
 - After each mutation the original contract was restored, `git diff -- contracts/Pattern2_BoundedAutonomy.sol` was empty, and the full suite passed again (77 tests, 0 failures).
 
 These are two targeted mutations, not a mutation-testing campaign. They show that these two lines are covered by tests; they do not show that every reachable defect would be caught.
+
+### One Attack, Three Patterns
+
+`test/AttackComparison.t.sol` runs the same threat against all three patterns: the planner key is stolen, the attacker holds every signature, and the contract holds 5 ETH.
+
+| Pattern | What the stolen key achieves | Assertion in the test |
+|---|---|---|
+| 1 — Planner / Executor | Drains the whole 5 ETH in one Intent | `attacker.balance == 5 ether` |
+| 2 — Bounded Autonomy | Cannot target a non-allowlisted address and cannot exceed the 1 ETH daily cap, but draining 3 ETH still takes only three days | `treasury.balance == 1 ether`, contract keeps `4 ether` |
+| 3 — Multi-Agent Arbitration | Cannot execute alone: one agent's approval is below quorum, and direct execution is disabled | `balance == 5 ether`, `nonce == 0` |
+
+The third row is the honest boundary of the second: a daily cap is a rate limit, not a barrier. It converts an instant total loss into a predictable, slow loss, which is exactly the trade-off a bounded-autonomy design is asked to make — and why the patterns compose rather than replace each other.
 
 ## Roadmap
 

@@ -10,6 +10,14 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ### Added
 
+- `test/AttackComparison.t.sol`: the same threat — a stolen planner key with every
+  signature valid — executed against all three patterns, so the difference between them
+  is asserted rather than described: Pattern 1 loses the whole balance, Pattern 2 is held
+  to its allowlist and daily cap and then drained over three days, and Pattern 3 cannot
+  execute without a second agent's approval.
+- `docs/grants/thedao-ethsecurity-initiative.md`: draft application for TheDAO Security
+  Fund's open ETHSecurity Initiatives round, with milestones and the eligibility checks
+  that must be made before submitting.
 - `test/SecurityReview.t.sol`: emergency-stop cases — a rejected Intent leaves the nonce
   and the daily spend untouched, the same signed Intent executes after
   `emergencyStop(false)`, `ContractPaused` takes precedence over `TargetNotAllowed`, and
