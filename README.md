@@ -170,6 +170,80 @@ The signer authorizes the Intent using an EIP-712 signature. Registered agents p
 - There is no target allowlist or daily spending cap in Pattern 3.
 - The pattern demonstrates controlled arbitration, not decentralized consensus.
 
+## Case Study — Constrained Treasury Payment
+
+### Scenario
+
+Imagine a treasury application that uses an AI agent to prepare a payment of 0.2 ETH to an approved service provider.
+
+The AI agent analyzes the request and proposes the payment. However, the application must not treat the agent's recommendation as sufficient authorization to move funds.
+
+The project’s three patterns demonstrate different ways to constrain this workflow.
+
+### Pattern 1 — Signed Execution
+
+1. The Planner prepares an Intent containing the destination, amount, calldata, nonce, and deadline.
+2. The authorized signer signs the exact Intent using EIP-712.
+3. The Executor verifies the signature, nonce, and deadline.
+4. The Executor performs the external call.
+
+**What this provides:** Explicit signer authorization, typed-data verification, replay protection, and expiration.
+
+**Remaining risk:** Pattern 1 does not restrict destination addresses or impose a daily spending cap. A compromised signer key could authorize an unsafe payment.
+
+### Pattern 2 — Bounded Execution
+
+The same payment is processed through Pattern 2.
+
+Before execution, the contract additionally checks:
+
+- Is the destination included in the admin-managed allowlist?
+- Would the payment exceed the configured daily native-currency spending cap?
+- Is the contract currently paused?
+
+If these checks pass, spending is recorded before the external call and execution proceeds.
+
+**What this adds:** Destination restrictions, daily native-currency spending limits, and emergency stop/resume controls.
+
+**Remaining risk:** The cap tracks `intent.value`; it does not account for ERC-20 transfers or other token exposure. The allowlist also does not establish that every function or calldata sent to an approved target is safe.
+
+### Pattern 3 — Multi-Agent Arbitration
+
+In a governance-oriented workflow, a registered agent can submit a payment proposal backed by a valid signed Intent.
+
+1. Registered agents review and vote on the proposal.
+2. The proposal must satisfy its quorum snapshot to be eligible for approval.
+3. The arbiter makes the final approval or rejection decision.
+4. If approved, the contract checks the nonce and executes the Intent.
+5. If rejected, the reserved nonce is released.
+
+**What this adds:** Agent participation, one vote per agent per proposal, proposal-specific quorum, nonce reservation, and arbiter-controlled resolution.
+
+**Remaining risk:** The arbiter remains a centralized authority. Pattern 3 does not implement a target allowlist or daily spending cap.
+
+### Key Security Tests
+
+| Test | What it catches | Test file |
+|---|---|---|
+| `test_ReentrancyCannotExceedDailySpendingCap` | Reentrancy attempts to bypass the daily spending cap | `test/Pattern2.t.sol` |
+| `test_MultipleTransactionsCannotExceedDailySpendingCap` | Multiple transactions attempting to exceed the daily cap | `test/Pattern2.t.sol` |
+| `test_RevertWhenTargetNotAllowed` | Execution targeting an address outside the allowlist | `test/Pattern2.t.sol` |
+
+### Lessons
+
+This scenario illustrates three distinct security boundaries:
+
+| Pattern | Main protection | Important limitation |
+|---|---|---|
+| Pattern 1 | Signed authorization and replay protection | No target allowlist or spending cap |
+| Pattern 2 | Allowlist and daily native-currency cap | Centralized admin; no ERC-20 cap |
+| Pattern 3 | Agent voting and quorum-based approval | Centralized arbiter; no target allowlist or spending cap |
+
+The patterns are educational reference designs, not interchangeable production-ready payment systems.
+
+**Key takeaway:** An AI agent may propose a payment, but authorization and execution constraints must be enforced independently of the agent's reasoning.
+
+This case study is illustrative. It does not claim that a live treasury integration or production payment deployment has been implemented or tested.
 ## What a Signature Does — and Does Not — Prove
 
 An EIP-712 signature binds authorization to the specified typed-data fields and signing domain.
