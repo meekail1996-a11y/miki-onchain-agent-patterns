@@ -883,4 +883,153 @@ contract SecurityReviewTest is Test {
         assertEq(address(target).balance, 2 ether, "2x the cap moved within one second");
         assertEq(bounded.dailySpent(), 1 ether, "day one is back at its own cap");
     }
+
+    // ------------------------------------------ Pattern 2 emergency stop
+
+    /// A rejected Intent must not consume anything: the nonce stays put and the cap
+    /// keeps its previous spend, so the same Intent can still run after a resume.
+    function test_PausedRejectionLeavesNonceAndDailySpendUntouched() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+
+        Pattern1_PlannerExecutor.Intent memory spent = _intent(
+            address(target),
+            0.4 ether,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(spent, _sign(address(bounded), spent));
+        assertEq(bounded.dailySpent(), 0.4 ether, "precondition: part of the cap is used");
+        assertEq(bounded.nonce(), 1, "precondition: nonce advanced once");
+
+        bounded.emergencyStop(true);
+
+        Pattern1_PlannerExecutor.Intent memory blocked = _intent(
+            address(target),
+            0.6 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        vm.expectRevert(Pattern2_BoundedAutonomy.ContractPaused.selector);
+        bounded.execute(blocked, _sign(address(bounded), blocked));
+
+        assertEq(bounded.nonce(), 1, "blocked Intent did not advance the nonce");
+        assertEq(bounded.dailySpent(), 0.4 ether, "blocked Intent did not consume the cap");
+        assertEq(address(target).balance, 0.4 ether, "no value moved while paused");
+    }
+
+    /// The pause check runs before the allowlist check, so a paused contract reports
+    /// `ContractPaused` even for a target that is not allowed.
+    function test_ContractPausedTakesPrecedenceOverTargetNotAllowed() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+        bounded.emergencyStop(true);
+
+        address stranger = makeAddr("not-allowlisted");
+        Pattern1_PlannerExecutor.Intent memory toStranger = _intent(
+            stranger,
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        vm.expectRevert(Pattern2_BoundedAutonomy.ContractPaused.selector);
+        bounded.execute(toStranger, _sign(address(bounded), toStranger));
+
+        // Once resumed, the same target fails on the allowlist instead.
+        bounded.emergencyStop(false);
+        vm.expectRevert(Pattern2_BoundedAutonomy.TargetNotAllowed.selector);
+        bounded.execute(toStranger, _sign(address(bounded), toStranger));
+    }
+
+    /// A rejected Intent keeps its signature: resuming lets the very same bytes through,
+    /// which is what makes the pause safe rather than destructive.
+    function test_ResumeExecutesTheSameSignedIntent() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+
+        Pattern1_PlannerExecutor.Intent memory spent = _intent(
+            address(target),
+            0.4 ether,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(spent, _sign(address(bounded), spent));
+
+        bounded.emergencyStop(true);
+
+        Pattern1_PlannerExecutor.Intent memory blocked = _intent(
+            address(target),
+            0.6 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        bytes memory blockedSignature = _sign(address(bounded), blocked);
+
+        vm.expectRevert(Pattern2_BoundedAutonomy.ContractPaused.selector);
+        bounded.execute(blocked, blockedSignature);
+
+        bounded.emergencyStop(false);
+        bounded.execute(blocked, blockedSignature);
+
+        assertEq(bounded.nonce(), 2, "resumed Intent advanced the nonce");
+        assertEq(bounded.dailySpent(), 1 ether, "resumed Intent consumed its value");
+        assertEq(address(target).balance, 1 ether, "value reached the target after resume");
+    }
+
+    /// The day reset is lazy and happens inside `execute` after the pause check, so a
+    /// pause across midnight leaves stale storage. The first execution afterwards must
+    /// reset it and expose the full cap for the new day, not what yesterday left over.
+    ///
+    /// While paused, `dailySpent` still holds the previous day's figure: it must never be
+    /// read as today's spend without comparing `lastSpendingResetDay` to the current day.
+    function test_ResumeAfterMidnightDoesNotCarryYesterdaySpend() public {
+        vm.warp(1_000);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern2_BoundedAutonomy bounded = _boundedWithCap(1 ether, address(target));
+
+        Pattern1_PlannerExecutor.Intent memory fullCap = _intent(
+            address(target),
+            1 ether,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(fullCap, _sign(address(bounded), fullCap));
+        assertEq(bounded.dailySpent(), 1 ether, "cap fully used on day zero");
+
+        bounded.emergencyStop(true);
+        vm.warp(86_400);
+
+        // Nothing ran across the boundary, so the stored counter is still yesterday's.
+        assertEq(bounded.dailySpent(), 1 ether, "counter is stale while paused");
+        assertEq(bounded.lastSpendingResetDay(), 0, "reset day is stale while paused");
+
+        bounded.emergencyStop(false);
+
+        Pattern1_PlannerExecutor.Intent memory nextDay = _intent(
+            address(target),
+            1 ether,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(nextDay, _sign(address(bounded), nextDay));
+
+        assertEq(bounded.dailySpent(), 1 ether, "new day starts from zero, then records its spend");
+        assertEq(bounded.lastSpendingResetDay(), 1, "reset advanced on the first execution");
+        assertEq(address(target).balance, 2 ether, "full cap available on the new day");
+    }
 }
