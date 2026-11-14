@@ -304,6 +304,14 @@ The Python signer includes input validation and a mainnet signing guard. Mainnet
 - Monitor administrative actions and execution events.
 - Do not use real funds without independent security review and additional hardening.
 
+## Scope and Guarantees
+
+This repository is an educational reference for the patterns that connect an AI agent to smart contracts: a signed planner/executor, a bounded executor with an allowlist and a daily cap, and multi-agent arbitration.
+
+It is not an independently audited codebase and it is not ready for production use. The tests and the static-analysis results in `docs/security.md` show that specific, named scenarios behave as documented. They do not prove the absence of vulnerabilities, and no such guarantee is made — passing tests and a curated Slither report are evidence about the scenarios that were exercised, not a statement about every reachable state.
+
+Using these patterns with real funds requires, at minimum: an independent security review, stronger access control than a single `immutable` admin, a multisig and/or timelock for administrative actions, and coverage for the transfer of ERC-20 assets, which the daily native-asset cap does not track.
+
 ## Repository Status
 
 | Component | Implementation | Tests |
@@ -418,6 +426,21 @@ python -m unittest discover -s tests -v
 The test suites cover signature validation, nonce handling, execution constraints, agent voting, arbitration, and selected adversarial scenarios.
 
 Passing tests demonstrate that the tested scenarios behave as expected. They do not constitute a formal verification or a complete security audit.
+
+### Mutation Checks
+
+Two targeted mutations were applied to `contracts/Pattern2_BoundedAutonomy.sol` to check that the tests fail when the accounting they depend on is removed.
+
+| Mutation | Temporary change | Failing tests |
+|---|---|---|
+| M1 | removed `dailySpent += intent.value` | 14 |
+| M2 | removed `dailySpent = 0` in the daily reset | 6 |
+
+- **M1** showed that recording spend is what the accounting assertions actually guard. With the line gone, 14 tests failed — including the fuzz cases that compare `dailySpent` against the value actually transferred — while the tests that only assert a revert above the cap stayed green. The two layers are independent: bounding a single transaction does not prove that spend is recorded.
+- **M2** showed that the daily reset is what makes the cap available again. Six tests failed; five of them reverted with `SpendingCapExceeded()` before any assertion ran, because yesterday's spend was still counted. A reset that forgets to clear the counter is a functional bug, not a cosmetic one.
+- After each mutation the original contract was restored, `git diff -- contracts/Pattern2_BoundedAutonomy.sol` was empty, and the full suite passed again (77 tests, 0 failures).
+
+These are two targeted mutations, not a mutation-testing campaign. They show that these two lines are covered by tests; they do not show that every reachable defect would be caught.
 
 ## Roadmap
 

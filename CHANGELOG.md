@@ -10,6 +10,15 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ### Added
 
+- `test/SecurityReview.t.sol`: emergency-stop cases — a rejected Intent leaves the nonce
+  and the daily spend untouched, the same signed Intent executes after
+  `emergencyStop(false)`, `ContractPaused` takes precedence over `TargetNotAllowed`, and
+  a pause across midnight does not carry yesterday's spend into the new day.
+- Validation: two targeted mutations (`dailySpent += intent.value` and `dailySpent = 0`
+  in the daily reset) were each caught by the suite, with 14 and 6 failing tests; the
+  original contract was restored and the full 77-test run passed again.
+- `README.md`: new `Scope and Guarantees` and `Mutation Checks` sections, which state what
+  the project does and does not guarantee and record the mutation evidence.
 - `test/SecurityReview.t.sol`: combined-state cases — a proposal that reaches quorum
   despite a cast rejection, a queued future-nonce proposal that executes once the
   executor nonce catches up, and a replay of an already executed Intent rejected by
