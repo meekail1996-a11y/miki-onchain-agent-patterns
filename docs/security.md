@@ -44,6 +44,9 @@ Residual risks that these controls do not remove are listed under each pattern's
 - Verifies that the signature belongs to the authorized signer.
 - Uses nonces to prevent replay of previously executed Intents.
 - Uses deadlines to reject expired Intents.
+- Rejects non-canonical signatures: OpenZeppelin's `tryRecover` returns `InvalidSignatureS` for a high-`s` value, so a valid signature cannot be mutated into a second valid form.
+- Binds the EIP-712 domain to the chain ID and to this contract's address, so a signature produced on another chain or for another deployment is rejected.
+- Compares deadlines inclusively: an Intent is still valid when `block.timestamp == intent.deadline` and rejected one second later.
 
 ### Known Limitations
 
@@ -85,6 +88,7 @@ Residual risks that these controls do not remove are listed under each pattern's
 - Reserves each executor nonce for at most one live proposal, so two approved proposals can never compete for the same nonce.
 - Guards arbiter resolution with a reentrancy lock.
 - Records execution status before the external call, so a failed execution leaves the proposal pending instead of permanently consumed.
+- Re-checks the Intent deadline at resolution time. An Intent that expires while its proposal is pending cannot execute; the proposal stays pending and an explicit rejection releases the reserved nonce so the executor can move on.
 
 ### Voter Eligibility and Quorum
 
@@ -136,6 +140,7 @@ This repository is an educational and experimental project.
 
 - It has not undergone an independent professional security audit.
 - It is not production-ready.
+- `test/SecurityReview.t.sol` pins the guarantees that are easy to regress: rejection of malleable (high-`s`) signatures, rejection of signatures bound to another chain, the inclusive deadline boundary, release of a nonce reserved by a proposal that expired before resolution, the arbiter-dependent liveness of a squatted nonce, blocked votes from removed agents, and token transfers escaping the native spending cap.
 - Passing automated tests does not guarantee the absence of vulnerabilities.
 - The documented controls reduce specific risks but do not eliminate all smart contract, key-management, operational, or integration risks.
 

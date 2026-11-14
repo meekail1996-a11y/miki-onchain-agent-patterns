@@ -8,7 +8,15 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `test/SecurityReview.t.sol`: tests pinning guarantees that were documented but not
+  previously exercised — malleable (high-`s`) signature rejection, cross-chain replay
+  rejection, the inclusive deadline boundary, recovery from a proposal that expires
+  before resolution, nonce squatting and its arbiter-dependent release, blocked votes
+  from removed agents, and token transfers escaping the native spending cap.
+- `docs/security.md` now states the signature-canonicalisation, chain-binding,
+  deadline and deferred-resolution guarantees explicitly.
 
 ## [v0.1.1] - 2026-11-14
 
