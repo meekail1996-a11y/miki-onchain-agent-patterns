@@ -8,7 +8,14 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `scripts/test_release_workflow.sh`: a harness that extracts the publish step from
+  `.github/workflows/release.yml` and runs it against a stubbed `gh` for four cases —
+  a matching changelog section, a missing section, a missing `CHANGELOG.md`, and a
+  release that already exists.
+- A `release-workflow-guard` CI job runs that harness on every push to `main` and on
+  every pull request, so the release guard cannot regress unnoticed.
 
 ## [v0.1.5] - 2026-11-14
 
