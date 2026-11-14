@@ -11,7 +11,7 @@ An AI agent may propose an action, but it should not receive unrestricted permis
 
 > **Core principle:** The Planner proposes. The Executor enforces.
 
-[Architecture](#architecture) · [Patterns](#patterns) · [Security Model](#security-model) · [Quick Start](#quick-start) · [Testing](#testing) · [Roadmap](#roadmap) · [Changelog](CHANGELOG.md)
+[Architecture](#architecture) · [Patterns](#patterns) · [Security Model](#security-model) · [Quick Start](#quick-start) · [Testing](#testing) · [Roadmap](#roadmap) · [Changelog](CHANGELOG.md) · [Security Policy](SECURITY.md)
 
 ---
 
