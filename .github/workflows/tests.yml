@@ -39,3 +39,12 @@ jobs:
 
       - name: Run Solidity tests
         run: forge test -vv
+
+  release-workflow-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify release workflow cases
+        run: bash scripts/test_release_workflow.sh
