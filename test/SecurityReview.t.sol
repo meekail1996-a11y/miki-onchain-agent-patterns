@@ -581,4 +581,177 @@ contract SecurityReviewTest is Test {
         );
         new Pattern3_MultiAgentArbitration(signer, address(0));
     }
+
+    // ------------------------------------- combined-state interactions
+
+    /// Rejections and approvals are counted independently: a proposal that reaches
+    /// its quorum executes even when other agents voted against it.
+    function test_RejectionsDoNotBlockExecutionAtQuorum() public {
+        (
+            Pattern3_MultiAgentArbitration arbitration,
+            address arbiter
+        ) = _deployArbitration();
+
+        address a1 = makeAddr("a1");
+        address a2 = makeAddr("a2");
+        address a3 = makeAddr("a3");
+
+        vm.startPrank(arbiter);
+        arbitration.addAgent(a1);
+        arbitration.addAgent(a2);
+        arbitration.addAgent(a3);
+        vm.stopPrank();
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(target),
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        vm.prank(a1);
+        uint256 proposalId = arbitration.propose(
+            intent,
+            _sign(address(arbitration), intent)
+        );
+
+        vm.prank(a1);
+        arbitration.vote(proposalId, true);
+        vm.prank(a2);
+        arbitration.vote(proposalId, false);
+        vm.prank(a3);
+        arbitration.vote(proposalId, true);
+
+        (
+            ,
+            ,
+            ,
+            uint256 approvals,
+            uint256 rejections,
+            uint256 quorum,
+
+        ) = arbitration.proposals(proposalId);
+
+        assertEq(quorum, 2, "strict majority of three agents");
+        assertEq(approvals, 2, "two approvals");
+        assertEq(rejections, 1, "one rejection is still recorded");
+
+        vm.prank(arbiter);
+        arbitration.resolveArbitration(proposalId, true);
+
+        assertEq(target.calls(), 1, "quorum wins over the single rejection");
+        assertEq(arbitration.nonce(), 1, "nonce advanced once");
+    }
+
+    /// A proposal for a future nonce can wait beside the current one and still
+    /// execute once the executor nonce reaches it.
+    function test_QueuedFutureNonceExecutesAfterEarlierIntent() public {
+        (
+            Pattern3_MultiAgentArbitration arbitration,
+            address arbiter
+        ) = _deployArbitration();
+
+        address agent = makeAddr("agent");
+        vm.prank(arbiter);
+        arbitration.addAgent(agent);
+
+        ReviewReceiver first = new ReviewReceiver();
+        ReviewReceiver second = new ReviewReceiver();
+
+        Pattern1_PlannerExecutor.Intent memory intentOne = _intent(
+            address(second),
+            0,
+            "",
+            1,
+            block.timestamp + 1 hours
+        );
+        Pattern1_PlannerExecutor.Intent memory intentZero = _intent(
+            address(first),
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        address[] memory agents = new address[](1);
+        agents[0] = agent;
+
+        // Queue the future nonce first: it is accepted but cannot execute yet.
+        vm.prank(agent);
+        uint256 queuedId = arbitration.propose(
+            intentOne,
+            _sign(address(arbitration), intentOne)
+        );
+
+        // Resolution checks quorum before the nonce, so the queued proposal needs
+        // its votes first; only then does the stale-nonce rejection surface.
+        _voteToQuorum(arbitration, queuedId, agents);
+        vm.prank(arbiter);
+        vm.expectRevert(Pattern1_PlannerExecutor.InvalidNonce.selector);
+        arbitration.resolveArbitration(queuedId, true);
+
+        vm.prank(agent);
+        uint256 currentId = arbitration.propose(
+            intentZero,
+            _sign(address(arbitration), intentZero)
+        );
+
+        _voteToQuorum(arbitration, currentId, agents);
+        vm.prank(arbiter);
+        arbitration.resolveArbitration(currentId, true);
+
+        assertEq(first.calls(), 1, "nonce 0 executed first");
+        assertEq(arbitration.nonce(), 1, "nonce moved to 1");
+        assertEq(second.calls(), 0, "queued intent still waiting");
+
+        // The queued proposal kept its votes and now matches the executor nonce.
+        vm.prank(arbiter);
+        arbitration.resolveArbitration(queuedId, true);
+
+        assertEq(second.calls(), 1, "queued intent executed after the nonce caught up");
+        assertEq(arbitration.nonce(), 2, "nonce advanced once per execution");
+    }
+
+    /// Once an Intent has executed, the same signed payload cannot be proposed
+    /// again: the executor nonce has moved past it.
+    function test_ReplayAfterExecutionRevertsOnNonce() public {
+        (
+            Pattern3_MultiAgentArbitration arbitration,
+            address arbiter
+        ) = _deployArbitration();
+
+        address agent = makeAddr("agent");
+        vm.prank(arbiter);
+        arbitration.addAgent(agent);
+
+        ReviewReceiver target = new ReviewReceiver();
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(target),
+            0,
+            "",
+            0,
+            block.timestamp + 1 hours
+        );
+
+        bytes memory signature = _sign(address(arbitration), intent);
+
+        vm.prank(agent);
+        uint256 proposalId = arbitration.propose(intent, signature);
+
+        address[] memory agents = new address[](1);
+        agents[0] = agent;
+        _voteToQuorum(arbitration, proposalId, agents);
+
+        vm.prank(arbiter);
+        arbitration.resolveArbitration(proposalId, true);
+
+        assertEq(target.calls(), 1, "executed once");
+        assertEq(arbitration.nonce(), 1, "nonce consumed");
+
+        vm.prank(agent);
+        vm.expectRevert(Pattern1_PlannerExecutor.InvalidNonce.selector);
+        arbitration.propose(intent, signature);
+    }
 }
