@@ -8,6 +8,10 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+## [v0.1.6] - 2026-11-15
+
+Test and documentation pass. No contract behaviour changed.
+
 ### Added
 
 - `test/AttackComparison.t.sol`: the same threat — a stolen planner key with every
@@ -24,7 +28,8 @@ While the project is at `0.x`, breaking changes may land in minor versions.
   a pause across midnight does not carry yesterday's spend into the new day.
 - Validation: two targeted mutations (`dailySpent += intent.value` and `dailySpent = 0`
   in the daily reset) were each caught by the suite, with 14 and 6 failing tests; the
-  original contract was restored and the full 77-test run passed again.
+  original contract was restored and the full 77-test run passed again (77 tests at the
+  time; the suite is now 81).
 - `README.md`: new `Scope and Guarantees` and `Mutation Checks` sections, which state what
   the project does and does not guarantee and record the mutation evidence.
 - `test/SecurityReview.t.sol`: combined-state cases — a proposal that reaches quorum
