@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>v0.1.6 — one attack, three patterns</title>
+    <style>
+      @page { size: 1600px 900px; margin: 0; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1600px; height: 900px; }
+      body {
+        background: #0b0f14;
+        color: #e6edf3;
+        font-family: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+        padding: 72px 88px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+      }
+      .glow {
+        position: absolute;
+        width: 900px; height: 900px;
+        right: -320px; top: -380px;
+        background: radial-gradient(circle, rgba(46,160,120,0.20), rgba(11,15,20,0) 65%);
+      }
+      header { display: flex; align-items: baseline; gap: 20px; position: relative; }
+      .tag {
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 22px; letter-spacing: 1.5px;
+        color: #2ea078;
+        border: 1px solid rgba(46,160,120,0.5);
+        border-radius: 999px;
+        padding: 8px 20px;
+      }
+      .kicker { font-size: 22px; color: #8b98a5; letter-spacing: 0.4px; }
+      h1 {
+        font-size: 84px; line-height: 1.05; font-weight: 650;
+        letter-spacing: -1.5px; position: relative;
+        margin-top: 26px;
+      }
+      h1 em { font-style: normal; color: #2ea078; }
+      .sub { font-size: 27px; color: #9aa7b4; margin-top: 18px; position: relative; }
+
+      .rows { margin-top: 48px; display: flex; flex-direction: column; gap: 0; position: relative; }
+      .row {
+        display: grid;
+        grid-template-columns: 54px 400px 1fr;
+        align-items: center;
+        gap: 26px;
+        padding: 26px 30px;
+        border-top: 1px solid #1d2731;
+      }
+      .row:last-child { border-bottom: 1px solid #1d2731; }
+      .num {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 26px; color: #55636f;
+      }
+      .name { font-size: 32px; font-weight: 600; color: #d7e0e8; }
+      .out { font-size: 29px; font-family: ui-monospace, Consolas, monospace; }
+      .bad { color: #e0605e; }
+      .mid { color: #d9a441; }
+      .good { color: #2ea078; }
+
+      footer {
+        display: flex; justify-content: space-between; align-items: flex-end;
+        border-top: 1px solid #1d2731; padding-top: 26px; position: relative;
+      }
+      .stats {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 24px; color: #c3ced8; line-height: 1.7;
+      }
+      .stats span { color: #6f7d8a; }
+      .meta { text-align: right; font-size: 21px; color: #6f7d8a; line-height: 1.7; }
+      .meta b { color: #9aa7b4; font-weight: 500; }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+
+    <header>
+      <span class="tag">v0.1.6</span>
+      <span class="kicker">on-chain agent patterns</span>
+    </header>
+
+    <main>
+      <h1>One attack.<br /><em>Three patterns.</em></h1>
+      <p class="sub">The planner key is stolen. Every signature is valid. The contract holds 5 ETH.</p>
+
+      <div class="rows">
+        <div class="row">
+          <div class="num">01</div>
+          <div class="name">Planner / Executor</div>
+          <div class="out bad">drains 5 ETH in one Intent</div>
+        </div>
+        <div class="row">
+          <div class="num">02</div>
+          <div class="name">Bounded Autonomy</div>
+          <div class="out mid">one cap per day — then a slow drain</div>
+        </div>
+        <div class="row">
+          <div class="num">03</div>
+          <div class="name">Multi-Agent Arbitration</div>
+          <div class="out good">nothing without a second agent</div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="stats">
+        81 Solidity tests &nbsp;·&nbsp; 7 Python &nbsp;·&nbsp; 4 CI guards<br />
+        <span>two mutations caught · all green</span>
+      </div>
+      <div class="meta">
+        <b>Educational reference, not an audit.</b><br />
+        github.com/meekail1996-a11y/miki-onchain-agent-patterns
+      </div>
+    </footer>
+  </body>
+</html>
