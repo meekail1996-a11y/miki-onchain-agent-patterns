@@ -10,6 +10,10 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ### Added
 
+- `scripts/check_doc_claims.py` and a `docs-claims` CI job: the documentation may only
+  cite test names that exist and test counts that match the suite. It caught two real
+  drifts on its first run — a stale `60 Solidity tests` comment and a coverage paragraph
+  that reflected an older suite.
 - `docs/security.md`: `Key Lifecycle` and `Liveness and Stalled Pipelines` sections. They
   record what each `immutable` key can do, what losing or leaking it costs, the migration
   order when rotation is required, and the fact that every stall path ends in an arbiter

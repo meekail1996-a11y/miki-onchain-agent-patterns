@@ -349,7 +349,7 @@ no deployment are required; only the first dependency install needs network acce
 
 ```bash
 git submodule update --init --recursive
-forge test                                   # 60 Solidity tests
+forge test                                   # 81 Solidity tests
 python -m pip install -r requirements.txt    # first run only
 python -m unittest discover -s tests -v      # 7 Python tests
 ```

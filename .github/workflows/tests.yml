@@ -48,3 +48,22 @@ jobs:
 
       - name: Verify release workflow cases
         run: bash scripts/test_release_workflow.sh
+
+  docs-claims:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check that documentation matches the suite
+        run: python scripts/check_doc_claims.py
