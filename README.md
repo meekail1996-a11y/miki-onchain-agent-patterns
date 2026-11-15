@@ -279,6 +279,8 @@ The project explores several complementary controls:
 | Reentrancy protection | Pattern 2 spending-order protection and Pattern 3 ReentrancyGuard |
 | Off-chain signing | Python Intent signer |
 
+Every privileged address (`agentSigner`, Pattern 2's `admin`, Pattern 3's `arbiter`) is `immutable`, so key rotation is a migration rather than a transaction. `docs/security.md` records what each key can do, what losing it costs, and the order in which to migrate; it also states plainly that the controls here are safety controls and that liveness depends on the arbiter.
+
 The Python signer includes input validation and a mainnet signing guard. Mainnet signing is blocked by default unless `ALLOW_MAINNET_SIGNING=1` is explicitly configured.
 
 ### Important risks

@@ -141,6 +141,45 @@ Slither 0.11.6 was run against the three contracts (forge 1.9.0, solc 0.8.38 as 
 
 `forge coverage` over the current suite reports 93.98% of lines, 90.79% of statements, 83.78% of branches and 92.31% of functions. Every line of the three contracts is executed by at least one test; the remaining gaps are in test helper code. Coverage is a coverage metric, not a security guarantee.
 
+## Key Lifecycle
+
+Every privileged address in this repository is `immutable`. That is a deliberate choice — it removes an entire class of "who can change the signer?" bugs — but it moves rotation out of the contract and into operations, which is where the risk now lives.
+
+| Key | Field | Consequence if lost | Consequence if stolen | In-contract recovery |
+|---|---|---|---|---|
+| Planner / signer | `agentSigner` (all three) | Nothing can be signed: the executor is frozen (Pattern 2 can still be paused, but not used) | Valid signatures for arbitrary Intents; the loss is bounded only by whatever sits above Pattern 1 | None — redeploy |
+| Admin | `admin` (Pattern 2) | The cap, the allowlist and the emergency stop can no longer be changed; a paused contract stays paused | Can allowlist any target, raise the cap, or pause execution indefinitely | None — redeploy |
+| Arbiter | `arbiter` (Pattern 3) | Every pending proposal stays pending forever, including the rejection that releases a squatted nonce | Can mint quorum by admitting agents it controls, and can approve or reject at will | None — redeploy |
+
+The two consequences worth pausing on:
+
+- **A lost admin is silent.** There is no event, no error, and no failing test. The deployment keeps accepting Intents and looks healthy until the day a cap needs changing.
+- **A stolen arbiter is not obviously visible either.** Voting proceeds normally; the arbiter simply approves whatever it wants, and admitted agents that it controls make quorum meaningless. Pattern 3's quorum constrains an arbiter only when the agents are genuinely independent of it.
+
+### Rotating a key without rotation support
+
+Rotation is a migration, not a transaction. The sequence below is the one the contracts allow; each step has a cost that is worth knowing in advance.
+
+1. Deploy a new instance with the new key and the same parameters (cap, allowlist, quorum shape). Verify the deployed bytecode against a local build before funding it.
+2. Recreate the allowlist entry by entry. This is the step that is silently skipped in a hurry, and it is the control that bounds a stolen signer.
+3. Fund the new contract with working capital only. Do not sweep the treasury in before the new instance has executed successfully at least once.
+4. Deal with the old instance honestly. If the signer is *lost*, its balance is unrecoverable: freezing it is the only safe action, and the loss is the balance. If the signer is *stolen*, pausing stops the attacker but also stops you — resuming to migrate re-opens the attacker's access at the cap rate, so migration must happen in cap-sized steps immediately after resuming, or not at all. There is no primitive here that moves funds while execution is paused.
+5. Reject every pending Pattern 3 proposal on the old instance before retiring it. A retired contract with pending proposals has reserved nonces and a frozen arbiter path, and the next person to read the state will assume it still matters.
+6. Remove the old address from agent configuration and monitors, and keep it monitored read-only for unexpected activity.
+
+A two-step handover (`proposeSigner` / `acceptSigner`) would remove most of this, at the cost of adding an administrative path an attacker can target. That trade-off is recorded under Future Security Improvements rather than implemented.
+
+## Liveness and Stalled Pipelines
+
+The controls in this repository are safety controls. None of them is a liveness control, and a system that is safe but stuck is still a failed system.
+
+- **Nonce squatting is the cheapest stall.** Any agent holding one genuinely signed Intent can propose it, reserve the current nonce, and abstain. New proposals for that nonce are rejected with `NonceAlreadyProposed`, so the queue stops until a human rejects the proposal. The signature check cannot help here: the signature is valid.
+- **Pending proposals do not expire.** The Intent's own `deadline` limits when it can execute, but nothing closes the proposal itself. `resolveArbitration` works whenever the arbiter calls it, which means a pending proposal can sit in that state indefinitely.
+- **Quorum can become unreachable.** Quorum is fixed when the proposal is created, so removing an agent can leave a proposal below its threshold forever. Rejection is again the only exit.
+- **The arbiter is the timeout.** Every escape path above ends in an arbiter call, so Pattern 3's liveness is the arbiter's availability, and behind a single key that availability is one lost device away from zero.
+
+What follows for an operator: monitor proposals whose age exceeds the expected voting window, treat a rising count as an incident rather than noise, and give the arbiter a multisig with a response expectation. The tests pin the behaviour (`test_SquattedNonceStallsPipelineUntilArbiterRejects`), which means a future change that silently makes the stall permanent would be caught.
+
 ## Operational Security Recommendations
 
 - Never commit private keys, seed phrases, API keys, or other secrets to the repository.
@@ -169,6 +208,8 @@ Potential improvements include:
 
 - Multisig and timelock-based administration.
 - An arbiter-transfer mechanism, so a lost arbiter key does not freeze governance; this needs a redesign because the arbiter is immutable today.
+- Signer and admin rotation, for example a two-step `proposeSigner` / `acceptSigner` handover, which today requires a full migration (see Key Lifecycle).
+- An on-chain timeout for pending proposals, so a squatted nonce or an unreachable quorum closes itself instead of waiting for a human.
 - A separate agent-admission role, so quorum cannot be minted by the approving arbiter.
 - Explicit expiry or timeout handling for proposals that can no longer reach quorum.
 - Stronger configuration validation.

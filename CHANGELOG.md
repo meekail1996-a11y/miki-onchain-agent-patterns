@@ -14,6 +14,10 @@ Test and documentation pass. No contract behaviour changed.
 
 ### Added
 
+- `docs/security.md`: `Key Lifecycle` and `Liveness and Stalled Pipelines` sections. They
+  record what each `immutable` key can do, what losing or leaking it costs, the migration
+  order when rotation is required, and the fact that every stall path ends in an arbiter
+  call — none of the controls in this repository is a liveness control.
 - `test/AttackComparison.t.sol`: the same threat — a stolen planner key with every
   signature valid — executed against all three patterns, so the difference between them
   is asserted rather than described: Pattern 1 loses the whole balance, Pattern 2 is held
