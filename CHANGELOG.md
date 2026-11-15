@@ -8,16 +8,19 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
-## [v0.1.6] - 2026-11-15
-
-Test and documentation pass. No contract behaviour changed.
-
 ### Added
 
 - `docs/security.md`: `Key Lifecycle` and `Liveness and Stalled Pipelines` sections. They
   record what each `immutable` key can do, what losing or leaking it costs, the migration
   order when rotation is required, and the fact that every stall path ends in an arbiter
-  call — none of the controls in this repository is a liveness control.
+  call — none of the controls in this repository is a liveness control. This landed after
+  `v0.1.6` was tagged, so it is not part of that release.
+
+## [v0.1.6] - 2026-11-15
+
+Test and documentation pass. No contract behaviour changed.
+
+### Added
 - `test/AttackComparison.t.sol`: the same threat — a stolen planner key with every
   signature valid — executed against all three patterns, so the difference between them
   is asserted rather than described: Pattern 1 loses the whole balance, Pattern 2 is held

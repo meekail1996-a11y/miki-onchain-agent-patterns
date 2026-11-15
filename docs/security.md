@@ -139,7 +139,9 @@ Slither 0.11.6 was run against the three contracts (forge 1.9.0, solc 0.8.38 as 
 
 ### Test Coverage
 
-`forge coverage` over the current suite reports 93.98% of lines, 90.79% of statements, 83.78% of branches and 92.31% of functions. Every line of the three contracts is executed by at least one test; the remaining gaps are in test helper code. Coverage is a coverage metric, not a security guarantee.
+`forge coverage` over the current 81-test suite reports **100% of lines** (124/124), 95.97% of statements (119/124), 86.11% of branches (31/36) and 100% of functions across the three contracts. Every line of every contract is executed by at least one test.
+
+The remaining gaps are statements and branches in `Pattern3_MultiAgentArbitration` (92.96% of statements, 79.17% of branches): `Pattern1_PlannerExecutor` and `Pattern2_BoundedAutonomy` are fully covered on every metric. An uncovered branch is not automatically a defect — some are unreachable defensive reverts — but a reviewer should read those paths rather than assume they are exercised. Coverage is a coverage metric, not a security guarantee.
 
 ## Key Lifecycle
 
