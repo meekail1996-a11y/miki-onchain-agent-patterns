@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>The fourth row — one stolen key, four designs</title>
+    <style>
+      @page { size: 1600px 900px; margin: 0; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1600px; height: 900px; }
+      body {
+        background: #0b0f14;
+        color: #e6edf3;
+        font-family: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+        padding: 62px 80px 54px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+      }
+      .glow {
+        position: absolute;
+        width: 900px; height: 900px;
+        right: -320px; top: -380px;
+        background: radial-gradient(circle, rgba(46,160,120,0.20), rgba(11,15,20,0) 65%);
+      }
+      header { display: flex; align-items: baseline; gap: 20px; position: relative; }
+      .tag {
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 21px; letter-spacing: 1.4px;
+        color: #2ea078;
+        border: 1px solid rgba(46,160,120,0.5);
+        border-radius: 999px;
+        padding: 7px 18px;
+      }
+      .kicker { font-size: 21px; color: #8b98a5; letter-spacing: 0.4px; }
+      h1 {
+        font-size: 70px; line-height: 1.05; font-weight: 650;
+        letter-spacing: -1.4px; position: relative;
+        margin-top: 20px;
+      }
+      h1 em { font-style: normal; color: #2ea078; }
+      .sub { font-size: 25px; color: #9aa7b4; margin-top: 14px; position: relative; }
+
+      .rows { margin-top: 34px; display: flex; flex-direction: column; position: relative; }
+      .row {
+        display: grid;
+        grid-template-columns: 52px 460px 1fr;
+        align-items: center;
+        gap: 24px;
+        padding: 19px 28px;
+        border-top: 1px solid #1d2731;
+      }
+      .row:last-child { border-bottom: 1px solid #1d2731; }
+      .row.ours { background: linear-gradient(90deg, rgba(46,160,120,0.07), rgba(11,15,20,0)); }
+      .num {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 24px; color: #55636f;
+      }
+      .name { font-size: 29px; font-weight: 600; color: #d7e0e8; }
+      .out { font-size: 26px; font-family: ui-monospace, Consolas, monospace; }
+      .bad { color: #e0605e; }
+      .mid { color: #d9a441; }
+      .good { color: #2ea078; }
+      .note {
+        font-size: 18px; font-weight: 400; color: #6f7d8a;
+        margin-left: 12px; white-space: nowrap;
+        font-family: "Segoe UI", Inter, system-ui, sans-serif;
+      }
+
+      footer {
+        display: flex; justify-content: space-between; align-items: flex-end;
+        border-top: 1px solid #1d2731; padding-top: 22px; position: relative;
+      }
+      .stats {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 22px; color: #c3ced8; line-height: 1.7;
+      }
+      .stats span { color: #6f7d8a; }
+      .meta { text-align: right; font-size: 19px; color: #6f7d8a; line-height: 1.7; }
+      .meta b { color: #9aa7b4; font-weight: 500; }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+
+    <header>
+      <span class="tag">field note</span>
+      <span class="kicker">on-chain agent patterns</span>
+    </header>
+
+    <main>
+      <h1>The key is stolen.<br /><em>Four designs.</em></h1>
+      <p class="sub">Same stolen planner key, same valid signature, one 5 ETH contract.</p>
+
+      <div class="rows">
+        <div class="row ours">
+          <div class="num">01</div>
+          <div class="name">Planner / Executor</div>
+          <div class="out bad">5 ETH gone in one Intent</div>
+        </div>
+        <div class="row ours">
+          <div class="num">02</div>
+          <div class="name">Bounded Autonomy</div>
+          <div class="out mid">one cap per day — then a slow drain</div>
+        </div>
+        <div class="row ours">
+          <div class="num">03</div>
+          <div class="name">Multi-Agent Arbitration</div>
+          <div class="out good">nothing without a second agent</div>
+        </div>
+        <div class="row">
+          <div class="num">04</div>
+          <div class="name">Agent Intent<span class="note">external — not tested here</span></div>
+          <div class="out good">the agent holds no key: the loss becomes spam</div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="stats">
+        81 Solidity tests &nbsp;·&nbsp; 7 Python &nbsp;·&nbsp; 4 CI guards<br />
+        <span>rows 01–03 asserted in test/AttackComparison.t.sol</span>
+      </div>
+      <div class="meta">
+        <b>Educational reference, not an audit.</b><br />
+        github.com/meekail1996-a11y/miki-onchain-agent-patterns
+      </div>
+    </footer>
+  </body>
+</html>
