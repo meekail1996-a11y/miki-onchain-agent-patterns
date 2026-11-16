@@ -10,6 +10,12 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ### Added
 
+- `test/Pattern2Invariant.t.sol`: sequence-level invariants for Pattern 2, which the fuzz
+  suite could not reach because it checks single calls. Over 256 runs and 128k handler calls
+  they assert that `dailySpent` never exceeds the cap in force, that the nonce advances once
+  per successful execution, and that the contract balance equals the ether the target really
+  received. Removing the cap check makes `invariant_DailySpendNeverExceedsCap` fail with
+  `dailySpent exceeded the cap`; the check was restored and the suite went green again.
 - `docs/security.md`: a `Test Evidence` table mapping each documented control to the test
   that would fail if it were removed, so a reviewer can go from a claim to an assertion.
   The documentation guard already rejects a test name that no test defines, so the table
@@ -48,6 +54,9 @@ covers the grant material as well as the README.
 
 ### Changed
 
+- `docs/security.md` coverage figures re-measured after the invariant suite landed:
+  statements 96.00% (120/125) and branches 85.71% (30/35) on the pinned solc 0.8.38, with
+  lines and functions unchanged at 100%. The old figures came from an earlier toolchain.
 - `Pattern2_BoundedAutonomy` rejects non-admin callers with a `NotAdmin()` custom error
   instead of a `require` string, matching the error style of the rest of the contract.
   The five tests that pinned the old revert data now assert the selector. No other

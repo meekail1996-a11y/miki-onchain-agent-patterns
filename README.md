@@ -349,7 +349,7 @@ no deployment are required; only the first dependency install needs network acce
 
 ```bash
 git submodule update --init --recursive
-forge test                                   # 81 Solidity tests
+forge test                                   # 82 Solidity tests
 python -m pip install -r requirements.txt    # first run only
 python -m unittest discover -s tests -v      # 7 Python tests
 ```
@@ -357,7 +357,7 @@ python -m unittest discover -s tests -v      # 7 Python tests
 Expected tail of the Solidity run:
 
 ```text
-Ran 7 test suites in 588.13ms (1.42s CPU time): 81 tests passed, 0 failed, 0 skipped (81 total tests)
+Ran 8 test suites in 20.27s (20.86s CPU time): 82 tests passed, 0 failed, 0 skipped (82 total tests)
 ```
 
 Expected tail of the Python run:
@@ -375,6 +375,7 @@ What each suite is worth running for:
 | `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
 | `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
 | `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
+| `forge test --match-path test/Pattern2Invariant.t.sol` | sequence-level invariants over random days and values: recorded spend never exceeds the cap, the nonce advances once per successful execution, and the balance matches the outflow the target actually received (256 runs, 128k calls) |
 | `forge test --match-path test/AttackComparison.t.sol` | the same stolen-key attack against all three patterns: Pattern 1 drains at once, Pattern 2 is held to the cap and then drained over days, Pattern 3 needs a second agent |
 | `python -m unittest discover -s tests -v` | EIP-712 digest parity between the Python signer and the Solidity contract |
 

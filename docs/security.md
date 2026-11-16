@@ -62,6 +62,9 @@ so this table cannot quietly rot.
 | Removed agents cannot vote | `test_RemovedAgentCannotVoteOnExistingProposal` | `test/SecurityReview.t.sol` |
 | Squatted nonce stalls, rejection frees it | `test_SquattedNonceStallsPipelineUntilArbiterRejects` | `test/SecurityReview.t.sol` |
 | Zero-address configuration rejected | `test_RevertWhenAgentSignerIsZero`, `test_RevertWhenArbiterIsZero`, `test_RevertWhenAddingZeroAddressTarget` | `test/SecurityReview.t.sol` |
+| Recorded spend stays within the cap across a sequence of days | `invariant_DailySpendNeverExceedsCap` | `test/Pattern2Invariant.t.sol` |
+| Nonce advances exactly once per successful execution | `invariant_NonceMatchesExecutions` | `test/Pattern2Invariant.t.sol` |
+| Contract balance equals recorded outflow, and the target received it | `invariant_BalanceMatchesOutflow` | `test/Pattern2Invariant.t.sol` |
 | Stolen-key outcome per pattern | `test_StolenPlannerKey_DrainsPattern1`, `test_StolenPlannerKey_IsBoundedInPattern2`, `test_StolenPlannerKey_DrainsPattern2OverDays`, `test_StolenPlannerKey_CannotExecuteAloneInPattern3` | `test/AttackComparison.t.sol` |
 
 A test named here is evidence about one scenario, not proof that the control is complete; the
@@ -170,7 +173,7 @@ Slither 0.11.6 was run against the three contracts (forge 1.9.0, solc 0.8.38 as 
 
 ### Test Coverage
 
-`forge coverage` over the current 81-test suite reports **100% of lines** (124/124), 95.97% of statements (119/124), 86.11% of branches (31/36) and 100% of functions across the three contracts. Every line of every contract is executed by at least one test.
+`forge coverage` over the current 82-test suite reports **100% of lines** (124/124), 96.00% of statements (120/125), 85.71% of branches (30/35) and 100% of functions across the three contracts, measured with `forge coverage --report summary --no-match-coverage "(test|script)/"` on the pinned solc 0.8.38. Every line of every contract is executed by at least one test.
 
 The remaining gaps are statements and branches in `Pattern3_MultiAgentArbitration` (92.96% of statements, 79.17% of branches): `Pattern1_PlannerExecutor` and `Pattern2_BoundedAutonomy` are fully covered on every metric. An uncovered branch is not automatically a defect — some are unreachable defensive reverts — but a reviewer should read those paths rather than assume they are exercised. Coverage is a coverage metric, not a security guarantee.
 
