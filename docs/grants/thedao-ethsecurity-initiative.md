@@ -82,7 +82,7 @@ after review of the diff and the test output.
 
 ## Prior work (evidence the applicant can execute)
 
-- The repository already contains the three patterns, a Python EIP-712 signer, 81 tests
+- The repository already contains the three patterns, a Python EIP-712 signer, 81 Solidity tests
   (fuzz properties included), a documented static-analysis pass, and a CI release guard.
 - Two targeted mutations were applied and caught: removing the spend counter broke 14
   tests, removing the daily reset broke 6; the original contract was restored and the full
