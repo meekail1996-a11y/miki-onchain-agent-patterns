@@ -25,6 +25,12 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 - README: a `Contributing` link in the navigation, which previously existed only in the
   file tree and in GitHub's own issue UI.
 
+### Fixed
+
+- `assets/social/`: the card and the 12-second video still said "81 Solidity tests" after the
+  invariant suite made it 82. Both are re-rendered from their sources, so the published
+  image matches the suite the README quotes.
+
 ## [v0.1.7] - 2026-11-16
 
 Contributor guide, social assets for the stolen-key post, and a documentation guard that now
