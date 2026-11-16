@@ -8,6 +8,11 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+## [v0.1.7] - 2026-11-16
+
+Contributor guide, social assets for the stolen-key post, and a documentation guard that now
+covers the grant material as well as the README.
+
 ### Added
 
 - `scripts/check_doc_claims.py` and a `docs-claims` CI job: the documentation may only
@@ -23,6 +28,12 @@ While the project is at `0.x`, breaking changes may land in minor versions.
   CI also runs, and the rules a change has to follow — no weakened tests, a mutation check
   for every new test, documentation counts kept in sync with `forge test`, and the
   private-advisory channel for security reports.
+- `assets/social/four-rows-card.html` and `.png`: a 1600×900 card for the "one stolen key,
+  four designs" post. Rows 01–03 are the tested patterns; row 04 is labelled
+  `external — not tested here` so the card cannot be read as a claim about this repository.
+- `assets/social/four-rows-12s.mp4` (with an original synthesised ambient bed), `-silent.mp4`,
+  `-12s.gif` and `-12s-poster.png`: a 12-second 1080×1350 motion graphic of the same card, for
+  embeds that cannot play video and for platforms that autoplay muted.
 
 ### Changed
 
@@ -30,6 +41,11 @@ While the project is at `0.x`, breaking changes may land in minor versions.
   instead of a `require` string, matching the error style of the rest of the contract.
   The five tests that pinned the old revert data now assert the selector. No other
   behaviour changed.
+- `scripts/check_doc_claims.py` now also checks `CONTRIBUTING.md`, `SECURITY.md` and the grant
+  drafts, and verifies suite counts (`Ran 7 test suites`) as well as test counts. Three
+  mutations were applied to prove the new checks fail rather than decorate a passing run: a
+  stale grant figure, a wrong suite count and an invented test name each failed the guard,
+  and the files were restored afterwards.
 
 ### Fixed
 
@@ -208,7 +224,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.7...HEAD
+[v0.1.7]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.6...v0.1.7
 [v0.1.6]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.5...v0.1.6
 [v0.1.5]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.4...v0.1.5
 [v0.1.4]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.3...v0.1.4
