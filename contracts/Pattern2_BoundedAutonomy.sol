@@ -9,6 +9,7 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor, ReentrancyGuard {
     error SpendingCapExceeded();
     error ContractPaused();
     error InvalidTarget();
+    error NotAdmin();
 
     address public immutable admin;
     uint256 public spendingCapPerDay;
@@ -25,7 +26,7 @@ contract Pattern2_BoundedAutonomy is Pattern1_PlannerExecutor, ReentrancyGuard {
     event EmergencyStop(bool status);
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Not admin");
+        if (msg.sender != admin) revert NotAdmin();
         _;
     }
 

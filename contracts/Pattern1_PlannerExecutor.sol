@@ -35,7 +35,6 @@ contract Pattern1_PlannerExecutor is EIP712 {
         agentSigner = _agentSigner;
     }
 
-    // تغییر: calldata به memory
     function execute(Intent memory intent, bytes memory signature) public virtual {
         _executeIntent(intent, signature);
     }

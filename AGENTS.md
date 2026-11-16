@@ -23,7 +23,7 @@ not add claims of guarantee to the README, the CHANGELOG, or a grant application
 | `scripts/` | Python signer and the release-workflow harness |
 | `docs/security.md` | Static-analysis findings and deliberate limitations |
 | `docs/grants/` | Grant application drafts |
-| `.github/workflows/` | `test.yml` and `release.yml` |
+| `.github/workflows/` | `tests.yml` and `release.yml` |
 
 ## Commands
 

@@ -19,6 +19,26 @@ While the project is at `0.x`, breaking changes may land in minor versions.
   order when rotation is required, and the fact that every stall path ends in an arbiter
   call — none of the controls in this repository is a liveness control. This landed after
   `v0.1.6` was tagged, so it is not part of that release.
+- `CONTRIBUTING.md`: the setup steps (including the submodules), the four local checks that
+  CI also runs, and the rules a change has to follow — no weakened tests, a mutation check
+  for every new test, documentation counts kept in sync with `forge test`, and the
+  private-advisory channel for security reports.
+
+### Changed
+
+- `Pattern2_BoundedAutonomy` rejects non-admin callers with a `NotAdmin()` custom error
+  instead of a `require` string, matching the error style of the rest of the contract.
+  The five tests that pinned the old revert data now assert the selector. No other
+  behaviour changed.
+
+### Fixed
+
+- Leftover non-English comments removed or translated: the `calldata`/`memory` note in
+  `Pattern1_PlannerExecutor.execute` and two comments in `test/SecurityTests.t.sol`.
+- `AGENTS.md` listed the CI workflow as `test.yml`; the file is
+  `.github/workflows/tests.yml`.
+- The changelog link block still compared `[Unreleased]` against `v0.1.5` and had no
+  `[v0.1.6]` definition, so the released version rendered as literal bracketed text.
 
 ## [v0.1.6] - 2026-11-15
 
@@ -188,7 +208,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.6...HEAD
+[v0.1.6]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.5...v0.1.6
 [v0.1.5]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.4...v0.1.5
 [v0.1.4]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.3...v0.1.4
 [v0.1.3]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.2...v0.1.3

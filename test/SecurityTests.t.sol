@@ -65,7 +65,7 @@ contract SecurityTests is Test {
             deadline: block.timestamp + 1 hours
         });
 
-        // یک کلید خصوصی جعلی (نه signer اصلی)
+        // A fake private key, not the real signer.
         (, uint256 fakeKey) = makeAddrAndKey("fakeSigner");
 
         bytes32 structHash = keccak256(
@@ -94,7 +94,7 @@ contract SecurityTests is Test {
         Pattern1_PlannerExecutor.Intent memory intent = Pattern1_PlannerExecutor.Intent({
             target: address(badTarget),
             value: 0,
-            data: hex"12345678", // فراخوانی تابع ناموجود
+            data: hex"12345678", // Calls a function that does not exist.
             nonce: 0,
             deadline: block.timestamp + 1 hours
         });

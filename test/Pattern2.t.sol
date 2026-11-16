@@ -178,7 +178,7 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            "Not admin"
+            Pattern2_BoundedAutonomy.NotAdmin.selector
         );
 
         bounded.addTarget(newTarget);
@@ -190,7 +190,7 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            "Not admin"
+            Pattern2_BoundedAutonomy.NotAdmin.selector
         );
 
         bounded.setSpendingCap(10 ether);
@@ -204,7 +204,7 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            "Not admin"
+            Pattern2_BoundedAutonomy.NotAdmin.selector
         );
 
         bounded.emergencyStop(false);
@@ -305,7 +305,7 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            "Not admin"
+            Pattern2_BoundedAutonomy.NotAdmin.selector
         );
 
         bounded.emergencyStop(true);
@@ -319,7 +319,7 @@ contract Pattern2Test is Test {
         vm.prank(unauthorized);
 
         vm.expectRevert(
-            "Not admin"
+            Pattern2_BoundedAutonomy.NotAdmin.selector
         );
 
         bounded.removeTarget(address(attacker));
