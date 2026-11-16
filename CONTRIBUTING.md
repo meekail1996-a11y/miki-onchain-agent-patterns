@@ -41,6 +41,8 @@ bash scripts/test_release_workflow.sh
 python scripts/check_doc_claims.py        # needs forge on PATH, or FORGE=/path/to/forge
 ```
 
+Or run all four in one command: `bash scripts/verify_all.sh`.
+
 These are the same four checks CI runs on every push to `main` and every pull request
 (`python-validation`, `solidity-tests`, `release-workflow-guard`, `docs-claims` in
 [`.github/workflows/tests.yml`](.github/workflows/tests.yml)).

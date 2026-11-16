@@ -8,6 +8,17 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- `docs/security.md`: a `Test Evidence` table mapping each documented control to the test
+  that would fail if it were removed, so a reviewer can go from a claim to an assertion.
+  The documentation guard already rejects a test name that no test defines, so the table
+  cannot rot silently.
+- `scripts/verify_all.sh`: one command for the four checks CI runs, referenced from the
+  README testing section and from `CONTRIBUTING.md`.
+- README: a `Contributing` link in the navigation, which previously existed only in the
+  file tree and in GitHub's own issue UI.
+
 ## [v0.1.7] - 2026-11-16
 
 Contributor guide, social assets for the stolen-key post, and a documentation guard that now

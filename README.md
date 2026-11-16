@@ -11,7 +11,7 @@ An AI agent may propose an action, but it should not receive unrestricted permis
 
 > **Core principle:** The Planner proposes. The Executor enforces.
 
-[Architecture](#architecture) · [Patterns](#patterns) · [Security Model](#security-model) · [Quick Start](#quick-start) · [Testing](#testing) · [Roadmap](#roadmap) · [Changelog](CHANGELOG.md) · [Security Policy](SECURITY.md)
+[Architecture](#architecture) · [Patterns](#patterns) · [Security Model](#security-model) · [Quick Start](#quick-start) · [Testing](#testing) · [Roadmap](#roadmap) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security Policy](SECURITY.md)
 
 ---
 
@@ -424,6 +424,13 @@ Run the Python test suite:
 
 ```bash
 python -m unittest discover -s tests -v
+```
+
+Or run all four checks CI runs — Solidity, Python, the release-workflow harness and the
+documentation guard — with one command:
+
+```bash
+bash scripts/verify_all.sh
 ```
 
 The test suites cover signature validation, nonce handling, execution constraints, agent voting, arbitration, and selected adversarial scenarios.

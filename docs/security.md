@@ -36,6 +36,37 @@ The implementation maps the most relevant threats to concrete on-chain controls:
 
 Residual risks that these controls do not remove are listed under each pattern's Known Limitations.
 
+## Test Evidence
+
+The table above says which control exists. This one says which test would fail if the control
+were removed, so a reviewer can go from a claim to an executable assertion instead of trusting
+the prose. `scripts/check_doc_claims.py` fails the build if a test named here stops existing,
+so this table cannot quietly rot.
+
+| Control | Test | Suite |
+|---|---|---|
+| Replay of an already executed Intent | `test_ReplayAfterExecutionRevertsOnNonce` | `test/SecurityReview.t.sol` |
+| Expired Intent rejected | `test_RevertWhenExpired` | `test/Pattern1.t.sol` |
+| Deadline compared inclusively | `test_DeadlineBoundaryIsInclusive` | `test/SecurityReview.t.sol` |
+| Malleable (high-`s`) signature rejected | `test_RejectsMalleableHighSSignature` | `test/SecurityReview.t.sol` |
+| Signature bound to chain and contract | `test_RejectsSignatureFromAnotherChain` | `test/SecurityReview.t.sol` |
+| Target allowlist enforced | `test_RevertWhenTargetNotAllowed` | `test/Pattern2.t.sol` |
+| Daily native-cap enforced | `test_RevertWhenSpendingCapExceeded` | `test/Pattern2.t.sol` |
+| Cap accounting under random inputs | `testFuzz_DailySpendingNeverExceedsCap` | `test/Pattern2Fuzz.t.sol` |
+| Reentrancy cannot raise the cap | `test_ReentrancyCannotExceedDailySpendingCap` | `test/Pattern2.t.sol` |
+| Pause checked before the allowlist | `test_ContractPausedTakesPrecedenceOverTargetNotAllowed` | `test/SecurityReview.t.sol` |
+| Day reset and midnight straddle | `test_DayResetDoesNotAccumulateAcrossIdleDays`, `test_BoundaryStraddleAllowsTwoCapsCloseTogether` | `test/SecurityReview.t.sol` |
+| ERC-20 transfers bypass the native cap (documented) | `test_TokenTransfersAreNotBoundedByTheNativeCap` | `test/SecurityReview.t.sol` |
+| Direct execution disabled in Pattern 3 | `test_RevertWhenDirectExecutionIsAttempted` | `test/Pattern3.t.sol` |
+| Arbiter cannot approve below quorum | `test_RevertWhenApprovingWithoutQuorum` | `test/Pattern3.t.sol` |
+| Removed agents cannot vote | `test_RemovedAgentCannotVoteOnExistingProposal` | `test/SecurityReview.t.sol` |
+| Squatted nonce stalls, rejection frees it | `test_SquattedNonceStallsPipelineUntilArbiterRejects` | `test/SecurityReview.t.sol` |
+| Zero-address configuration rejected | `test_RevertWhenAgentSignerIsZero`, `test_RevertWhenArbiterIsZero`, `test_RevertWhenAddingZeroAddressTarget` | `test/SecurityReview.t.sol` |
+| Stolen-key outcome per pattern | `test_StolenPlannerKey_DrainsPattern1`, `test_StolenPlannerKey_IsBoundedInPattern2`, `test_StolenPlannerKey_DrainsPattern2OverDays`, `test_StolenPlannerKey_CannotExecuteAloneInPattern3` | `test/AttackComparison.t.sol` |
+
+A test named here is evidence about one scenario, not proof that the control is complete; the
+Known Limitations sections record what each control deliberately leaves uncovered.
+
 ## Pattern 1 — Signed Intent
 
 ### Security Controls
