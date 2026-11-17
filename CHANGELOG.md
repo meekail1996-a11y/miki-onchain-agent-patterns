@@ -8,6 +8,13 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [v0.1.8] - 2026-11-17
+
+Sequence-level invariants for Pattern 2, a documentation guard that reads the suite instead
+of guessing, and social assets that follow the new count. No contract behaviour changed.
+
 ### Added
 
 - `test/Pattern2Invariant.t.sol`: sequence-level invariants for Pattern 2, which the fuzz
@@ -250,7 +257,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.8...HEAD
+[v0.1.8]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.7...v0.1.8
 [v0.1.7]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.6...v0.1.7
 [v0.1.6]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.5...v0.1.6
 [v0.1.5]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.4...v0.1.5
