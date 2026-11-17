@@ -8,6 +8,23 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+### Changed
+
+- `test/Pattern2Invariant.t.sol` now drives all four handler actions. `changeCap` and
+  `togglePause` called admin-only functions from the handler, which is not the admin, so
+  both reverted on every call (31,895/31,895 and 32,167/32,167 in the trace table) and the
+  invariants never observed a cap change or a pause. They are pranked as the admin now, and
+  every action succeeds.
+- `invariant_DailySpendNeverExceedsCap`, named in the v0.1.8 notes, is now
+  `invariant_ExecutionNeverExceedsCap`; the released text is left as it was published.
+- The spend invariant compared the live `dailySpent` with the live cap. That flagged the
+  admin's documented ability to lower the cap below what is already spent, which is not a
+  spend. It is replaced by `invariant_ExecutionNeverExceedsCap`, which checks the property
+  where it belongs — right after each execution — and by `invariant_NoExecutionWhilePaused`,
+  which gives the pause path something to break. Two mutations: dropping the pause check
+  fails with `an execution succeeded while paused`, and a cap check that ignores the new
+  value fails with `an execution left dailySpent above the cap`. Both were reverted.
+
 ### Fixed
 
 - `README.md` said the suite passed again with "77 tests, 0 failures" after the mutation

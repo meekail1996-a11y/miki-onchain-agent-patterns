@@ -375,7 +375,7 @@ What each suite is worth running for:
 | `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
 | `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
 | `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
-| `forge test --match-path test/Pattern2Invariant.t.sol` | sequence-level invariants over random days and values: recorded spend never exceeds the cap, the nonce advances once per successful execution, and the balance matches the outflow the target actually received (256 runs, 128k calls) |
+| `forge test --match-path test/Pattern2Invariant.t.sol` | sequence-level invariants over random days, values, cap changes and pause/resume: no execution leaves the recorded spend above the cap in force at that moment, none succeeds while paused, the nonce advances once per successful execution, and the balance matches the outflow the target actually received (256 runs, 128k calls) |
 | `forge test --match-path test/AttackComparison.t.sol` | the same stolen-key attack against all three patterns: Pattern 1 drains at once, Pattern 2 is held to the cap and then drained over days, Pattern 3 needs a second agent |
 | `python -m unittest discover -s tests -v` | EIP-712 digest parity between the Python signer and the Solidity contract |
 

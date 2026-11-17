@@ -62,7 +62,8 @@ so this table cannot quietly rot.
 | Removed agents cannot vote | `test_RemovedAgentCannotVoteOnExistingProposal` | `test/SecurityReview.t.sol` |
 | Squatted nonce stalls, rejection frees it | `test_SquattedNonceStallsPipelineUntilArbiterRejects` | `test/SecurityReview.t.sol` |
 | Zero-address configuration rejected | `test_RevertWhenAgentSignerIsZero`, `test_RevertWhenArbiterIsZero`, `test_RevertWhenAddingZeroAddressTarget` | `test/SecurityReview.t.sol` |
-| Recorded spend stays within the cap across a sequence of days | `invariant_DailySpendNeverExceedsCap` | `test/Pattern2Invariant.t.sol` |
+| No execution leaves the recorded spend above the cap in force at that moment | `invariant_ExecutionNeverExceedsCap` | `test/Pattern2Invariant.t.sol` |
+| A paused contract executes nothing | `invariant_NoExecutionWhilePaused` | `test/Pattern2Invariant.t.sol` |
 | Nonce advances exactly once per successful execution | `invariant_NonceMatchesExecutions` | `test/Pattern2Invariant.t.sol` |
 | Contract balance equals recorded outflow, and the target received it | `invariant_BalanceMatchesOutflow` | `test/Pattern2Invariant.t.sol` |
 | Stolen-key outcome per pattern | `test_StolenPlannerKey_DrainsPattern1`, `test_StolenPlannerKey_IsBoundedInPattern2`, `test_StolenPlannerKey_DrainsPattern2OverDays`, `test_StolenPlannerKey_CannotExecuteAloneInPattern3` | `test/AttackComparison.t.sol` |
