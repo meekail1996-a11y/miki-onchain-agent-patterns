@@ -7,13 +7,18 @@ Three classes of claim are checked:
    the Foundry suite. A renamed or deleted test must not leave a document pointing at
    nothing.
 2. Every plain test count in the documentation ("82 tests passed", "82-test suite",
-   "82 Solidity tests") must equal the number of tests Foundry reports.
+   "82 Solidity tests", "82 tests, 0 failures") must equal the number Foundry reports.
 3. Every suite count ("Ran 8 test suites") must equal the number of test contracts
    Foundry reports.
 
 Foundry runs every `invariant_*` function of a contract inside a single test, so an
 invariant contract counts as one test and not one per invariant. The count here mirrors
 that, which is why the total matches the `N tests passed` line the README quotes.
+
+Run with `--self-test` to check the patterns themselves against fixtures, without Forge:
+that is the regression test for this guard. It exists because the guard once missed
+`(77 tests, 0 failures)` — a sentence whose shape no pattern covered — and a passing run
+on real docs could not reveal it. `scripts/verify_all.sh` and the CI job run both modes.
 
 The documents checked are the ones a reader can act on: the README, the security model,
 the contributor and security guides, and the grant drafts — the grant material is what a
@@ -46,8 +51,12 @@ DOC_GLOBS = ["docs/grants/*.md"]
 # Not preceded by a path separator: `scripts/test_release_workflow.sh` is a script,
 # not a test function.
 TEST_NAME = re.compile(r"(?<![A-Za-z0-9_/])(?:test|invariant)_[A-Za-z0-9_]+")
+
+# Each shape a test count is written in somewhere in the documentation. A new sentence
+# shape needs a new pattern; `--self-test` is what keeps that honest.
 COUNT_CLAIMS = [
     re.compile(r"(\d+) tests passed"),  # README run output
+    re.compile(r"(\d+) tests, 0 failures"),  # README mutation-check sentence
     re.compile(r"(\d+)-test suite"),  # docs/security.md coverage paragraph
     re.compile(r"(\d+) Solidity tests"),  # README feature line, grant prior work
 ]
@@ -114,6 +123,36 @@ def suite_contents() -> tuple[set[str], int, list[str]]:
     return known, total, suites
 
 
+def claim_failures(
+    doc: str, text: str, known: set[str], total: int, suite_count: int
+) -> list[str]:
+    failures: list[str] = []
+
+    for name in sorted(set(TEST_NAME.findall(text))):
+        if name not in known:
+            failures.append(f"{doc}: mentions {name}, which no test defines")
+
+    for pattern in COUNT_CLAIMS:
+        for raw in pattern.findall(text):
+            claimed = int(raw)
+            if claimed != total:
+                failures.append(
+                    f"{doc}: claims {claimed} tests, the suite has {total} "
+                    f"(matched {pattern.pattern!r})"
+                )
+
+    for pattern in SUITE_CLAIMS:
+        for raw in pattern.findall(text):
+            claimed = int(raw)
+            if claimed != suite_count:
+                failures.append(
+                    f"{doc}: claims {claimed} test suites, `forge test` runs "
+                    f"{suite_count} (matched {pattern.pattern!r})"
+                )
+
+    return failures
+
+
 def documents() -> list[str]:
     found = list(DOCS)
     for pattern in DOC_GLOBS:
@@ -121,7 +160,56 @@ def documents() -> list[str]:
     return found
 
 
+def self_test() -> int:
+    """Pin the patterns themselves, so a shape the guard cannot see is a failing test."""
+    known = {"test_RealOne", "invariant_RealInvariant"}
+    cases = [
+        # (description, text, expected number of failures)
+        (
+            "current run output",
+            "Ran 8 test suites in 20.27s: 82 tests passed, 0 failed, 0 skipped",
+            0,
+        ),
+        (
+            "mutation-check sentence, current count",
+            "the full suite passed again (82 tests, 0 failures).",
+            0,
+        ),
+        (
+            "mutation-check sentence, stale count",
+            "the full suite passed again (77 tests, 0 failures).",
+            1,
+        ),
+        ("coverage paragraph", "the 82-test suite, statements 96.00%", 0),
+        ("feature line", "82 Solidity tests and 7 Python tests", 0),
+        ("stale suite count", "Ran 7 test suites in 20.27s", 1),
+        ("existing test name", "asserted in test_RealOne", 0),
+        ("invented test name", "asserted in test_DoesNotExist", 1),
+        ("invented invariant name", "asserted in invariant_DoesNotExist", 1),
+    ]
+
+    problems = 0
+    for description, text, expected in cases:
+        failures = claim_failures("fixture.md", text, known, total=82, suite_count=8)
+        if len(failures) != expected:
+            problems += 1
+            print(
+                f"  FAIL  {description}: expected {expected} failure(s), got {len(failures)}"
+            )
+            for failure in failures:
+                print(f"        {failure}")
+
+    if problems:
+        print(f"self-test failed: {problems} case(s) behaved unexpectedly")
+        return 1
+    print(f"self-test OK: {len(cases)} cases, every count shape is checked")
+    return 0
+
+
 def main() -> int:
+    if "--self-test" in sys.argv[1:]:
+        return self_test()
+
     known, total, suites = suite_contents()
     failures: list[str] = []
 
@@ -130,29 +218,9 @@ def main() -> int:
         if not path.exists():
             failures.append(f"{doc}: listed as a checked document but does not exist")
             continue
-        text = path.read_text(encoding="utf-8")
-
-        for name in sorted(set(TEST_NAME.findall(text))):
-            if name not in known:
-                failures.append(f"{doc}: mentions {name}, which no test defines")
-
-        for pattern in COUNT_CLAIMS:
-            for raw in pattern.findall(text):
-                claimed = int(raw)
-                if claimed != total:
-                    failures.append(
-                        f"{doc}: claims {claimed} tests, the suite has {total} "
-                        f"(matched {pattern.pattern!r})"
-                    )
-
-        for pattern in SUITE_CLAIMS:
-            for raw in pattern.findall(text):
-                claimed = int(raw)
-                if claimed != len(suites):
-                    failures.append(
-                        f"{doc}: claims {claimed} test suites, `forge test` runs "
-                        f"{len(suites)} (matched {pattern.pattern!r})"
-                    )
+        failures.extend(
+            claim_failures(doc, path.read_text(encoding="utf-8"), known, total, len(suites))
+        )
 
     if failures:
         print("Documentation and test suite disagree:\n")

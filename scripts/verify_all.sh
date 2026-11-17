@@ -5,7 +5,8 @@
 #   1. the Foundry suite                 (job: solidity-tests)
 #   2. the Python signer suite           (job: python-validation)
 #   3. the release-workflow harness      (job: release-workflow-guard)
-#   4. the documentation claim guard     (job: docs-claims)
+#   4. the documentation claim guard     (job: docs-claims), in both modes:
+#      `--self-test` pins the count patterns, then the real run checks the documents
 #
 # Usage:
 #   bash scripts/verify_all.sh
@@ -50,6 +51,7 @@ step "Release workflow harness"
 check "test_release_workflow.sh" bash scripts/test_release_workflow.sh
 
 step "Documentation claims"
+check "check_doc_claims.py --self-test" "$python_bin" scripts/check_doc_claims.py --self-test
 check "check_doc_claims.py" "$python_bin" scripts/check_doc_claims.py
 
 printf '\n'

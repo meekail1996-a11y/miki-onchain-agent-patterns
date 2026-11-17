@@ -449,7 +449,7 @@ Two targeted mutations were applied to `contracts/Pattern2_BoundedAutonomy.sol` 
 
 - **M1** showed that recording spend is what the accounting assertions actually guard. With the line gone, 14 tests failed — including the fuzz cases that compare `dailySpent` against the value actually transferred — while the tests that only assert a revert above the cap stayed green. The two layers are independent: bounding a single transaction does not prove that spend is recorded.
 - **M2** showed that the daily reset is what makes the cap available again. Six tests failed; five of them reverted with `SpendingCapExceeded()` before any assertion ran, because yesterday's spend was still counted. A reset that forgets to clear the counter is a functional bug, not a cosmetic one.
-- After each mutation the original contract was restored, `git diff -- contracts/Pattern2_BoundedAutonomy.sol` was empty, and the full suite passed again (77 tests, 0 failures).
+- After each mutation the original contract was restored, `git diff -- contracts/Pattern2_BoundedAutonomy.sol` was empty, and the full suite passed again (82 tests, 0 failures).
 
 These are two targeted mutations, not a mutation-testing campaign. They show that these two lines are covered by tests; they do not show that every reachable defect would be caught.
 

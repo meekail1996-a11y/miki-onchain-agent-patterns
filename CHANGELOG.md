@@ -8,7 +8,13 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- `README.md` said the suite passed again with "77 tests, 0 failures" after the mutation
+  checks, a figure from before the invariant suite. The documentation guard missed it
+  because none of its patterns covered that sentence shape. It now checks
+  `N tests, 0 failures` and runs a fixture-based `--self-test`, so deleting a pattern
+  fails the build instead of silently reopening the hole.
 
 ## [v0.1.8] - 2026-11-17
 

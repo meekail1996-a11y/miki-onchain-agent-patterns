@@ -65,5 +65,8 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Check the guard's own patterns
+        run: python scripts/check_doc_claims.py --self-test
+
       - name: Check that documentation matches the suite
         run: python scripts/check_doc_claims.py
