@@ -6,8 +6,9 @@ January 31, 2027. Fill the `TODO` fields before submitting.
 
 The baseline is the shipped `v0.1.8` state
 (https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.8).
-M3 v1 is merged to `main`; its 110-test, 9-suite validation passes locally, and the `Tests`
-run on that commit is the CI record rather than a figure quoted here.
+M3 v1 is merged to `main`; its 110-test, 9-suite validation passes locally and in CI
+(the `Tests` workflow, run on `9279a12`), which is the record rather than a figure quoted
+here.
 It deliberately separates **what exists** from **what the grant would fund**, because most
 of what an earlier draft promised as future work is already merged and tested.
 
@@ -44,7 +45,7 @@ author can build, not a shipped capability.
 | Component | State |
 |---|---|
 | Three reference contracts (planner/executor, bounded autonomy, multi-agent arbitration) | Merged, `v0.1.8` |
-| Solidity suite | 110 tests in 9 suites, green locally; the CI run on that commit is the first pass that covers the metered path |
+| Solidity suite | 110 tests in 9 suites, green locally and in CI (`Tests` on `9279a12`) |
 | Metered ERC-20 transfer path (M3 v1) | Merged to `main`; 23 of the suite's tests cover it |
 | Sequence-level invariants | 5 invariants, 256 runs, 128,000 handler calls, every handler action succeeding (measured locally) |
 | Python EIP-712 signer and digest-parity tests | 7 tests, green in CI |
