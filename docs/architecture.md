@@ -119,8 +119,9 @@ mode: a rejected Intent produces no transfer, no nonce change and no recorded sp
 
 ### Sequence-level properties
 
-Four invariants run against a handler that executes allowlisted and non-allowlisted Intents,
-changes the cap, jumps days and pauses/resumes, over 256 runs and 128,000 calls:
+Five invariants run against a handler that executes allowlisted and non-allowlisted Intents,
+changes the native and token caps, transfers a registered token, jumps days and pauses and
+resumes, over 256 runs and 128,000 calls:
 
 | Invariant | Property |
 |---|---|
@@ -128,8 +129,9 @@ changes the cap, jumps days and pauses/resumes, over 256 runs and 128,000 calls:
 | `invariant_NoExecutionWhilePaused` | No execution succeeds while the contract is paused |
 | `invariant_NonceMatchesExecutions` | The nonce advances exactly once per successful execution |
 | `invariant_BalanceMatchesOutflow` | Contract balance equals funding minus recorded outflow, and the target really received that ether |
+| `invariant_TokenSpendNeverExceedsCap` | No transfer of a registered token leaves that token's recorded spend above its non-zero cap |
 
-Each has been mutation-checked: removing the pause check fails the second with
+The first two have been mutation-checked: removing the pause check fails the second with
 `an execution succeeded while paused`, and a cap check that ignores the new value fails the
 first with `an execution left dailySpent above the cap`.
 
@@ -162,7 +164,7 @@ axis, not three products.
 
 Stated so that no reader has to infer it:
 
-- **The four invariants do not prove liveness.** Removing the pause check or the cap check
+- **The five invariants do not prove liveness.** Removing the pause check or the cap check
   is caught; removing `dailySpent += intent.value`, or the `dailySpent = 0` in the day
   reset, is not. Accounting and the day boundary are pinned by the unit and fuzz suites
   (`test/Pattern2Fuzz.t.sol`, and the mutation results in the README), not by the invariants.

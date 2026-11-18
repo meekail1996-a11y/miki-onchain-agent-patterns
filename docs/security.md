@@ -71,6 +71,7 @@ so this table cannot quietly rot.
 | A paused contract executes nothing | `invariant_NoExecutionWhilePaused` | `test/Pattern2Invariant.t.sol` |
 | Nonce advances exactly once per successful execution | `invariant_NonceMatchesExecutions` | `test/Pattern2Invariant.t.sol` |
 | Contract balance equals recorded outflow, and the target received it | `invariant_BalanceMatchesOutflow` | `test/Pattern2Invariant.t.sol` |
+| Today's spend of a registered token never exceeds its non-zero cap | `invariant_TokenSpendNeverExceedsCap` | `test/Pattern2Invariant.t.sol` |
 | Stolen-key outcome per pattern | `test_StolenPlannerKey_DrainsPattern1`, `test_StolenPlannerKey_IsBoundedInPattern2`, `test_StolenPlannerKey_DrainsPattern2OverDays`, `test_StolenPlannerKey_CannotExecuteAloneInPattern3` | `test/AttackComparison.t.sol` |
 
 A test named here is evidence about one scenario, not proof that the control is complete; the

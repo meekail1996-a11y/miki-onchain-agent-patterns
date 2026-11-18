@@ -8,6 +8,16 @@ While the project is at `0.x`, breaking changes may land in minor versions.
 
 ## [Unreleased]
 
+### Added
+
+- `docs/adoption.md`: a usage guide that starts from a reader's situation rather than from the
+  patterns, states which limits survive adaptation, and describes a half-day trial.
+
+### Fixed
+
+- `docs/architecture.md` and `docs/security.md` still described four invariants after
+  `invariant_TokenSpendNeverExceedsCap` landed; both now list all five.
+
 ## [v0.1.9] - 2026-11-18
 
 A metered ERC-20 path for Pattern 2: a registered token can be paid only by a direct
