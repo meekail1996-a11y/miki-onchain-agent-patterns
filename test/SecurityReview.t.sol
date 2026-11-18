@@ -23,10 +23,30 @@ contract MockToken is ERC20 {
     }
 }
 
+/// A spender that pulls with `transferFrom`, the shape a router, an aggregator or a
+/// Permit2-style contract has: it needs an allowance granted beforehand, and it can spend
+/// it in a transaction the executor never runs.
+contract PullRouter {
+    function pull(ERC20 token, address from, uint256 amount) external {
+        token.transferFrom(from, address(this), amount);
+    }
+}
+
+/// Takes `take` and hands back `give` inside the same call, so the gross outflow and the
+/// net decrease of the caller's balance differ by construction.
+contract RebateRouter {
+    function run(ERC20 token, uint256 take, uint256 give) external {
+        token.transferFrom(msg.sender, address(this), take);
+        token.transfer(msg.sender, give);
+    }
+}
+
 /// @notice Pins guarantees that docs/security.md claims but the existing suites
 /// did not exercise: signature malleability, cross-chain replay, the inclusive
 /// deadline boundary, expired-proposal recovery, nonce squatting, removed-agent
-/// voting, and the documented ERC-20 blind spot of the native spending cap.
+/// voting, the ERC-20 blind spot that the metered path closes, the refusal of `approve` on a
+/// registered token, an allowance that exists before the policy is relied on, and the absence
+/// of ERC-1271 in the executor.
 contract SecurityReviewTest is Test {
     bytes32 private constant INTENT_TYPEHASH = keccak256(
         "Intent(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline)"
@@ -191,19 +211,22 @@ contract SecurityReviewTest is Test {
 
     // ------------------------------------------------------- Pattern 2 checks
 
-    /// Documented limitation, made executable: the cap only counts native value,
-    /// so an allowed token contract can be drained of tokens at zero cap cost.
-    function test_TokenTransfersAreNotBoundedByTheNativeCap() public {
+    /// The blind spot the native cap always had, closed for a registered token: the whole
+    /// balance cannot leave in one call, and a transfer within the token's own budget is
+    /// charged to the token rather than to the native cap. This test used to assert the
+    /// opposite — tokens moving at zero cap cost — and is the case the metered path replaces.
+    function test_TokenTransfersAreBoundedByTheirOwnCap() public {
         Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
         MockToken token = new MockToken();
 
         token.mint(address(bounded), 1_000e18);
 
         bounded.addTarget(address(token));
+        bounded.addMeteredToken(address(token), 100e18);
 
         uint256 capBefore = bounded.spendingCapPerDay();
 
-        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+        Pattern1_PlannerExecutor.Intent memory drain = _intent(
             address(token),
             0,
             abi.encodeCall(ERC20.transfer, (address(this), 1_000e18)),
@@ -211,11 +234,26 @@ contract SecurityReviewTest is Test {
             block.timestamp + 1 hours
         );
 
-        bounded.execute(intent, _sign(address(bounded), intent));
+        vm.expectRevert(Pattern2_BoundedAutonomy.TokenCapExceeded.selector);
+        bounded.execute(drain, _sign(address(bounded), drain));
 
-        assertEq(token.balanceOf(address(this)), 1_000e18, "tokens moved");
+        assertEq(token.balanceOf(address(this)), 0, "the balance cannot leave in one call");
+        assertEq(token.balanceOf(address(bounded)), 1_000e18, "nothing moved");
         assertEq(bounded.dailySpent(), 0, "native accounting untouched");
-        assertEq(bounded.spendingCapPerDay(), capBefore, "cap unchanged");
+        assertEq(bounded.spendingCapPerDay(), capBefore, "the native cap is a separate budget");
+
+        Pattern1_PlannerExecutor.Intent memory within = _intent(
+            address(token),
+            0,
+            abi.encodeCall(ERC20.transfer, (address(this), 100e18)),
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(within, _sign(address(bounded), within));
+
+        assertEq(token.balanceOf(address(this)), 100e18, "the registered budget is spendable");
+        assertEq(bounded.tokenSpentToday(address(token)), 100e18, "charged to the token");
+        assertEq(bounded.dailySpent(), 0, "still no native charge");
     }
 
     // ------------------------------------------------------- Pattern 3 checks
@@ -1031,5 +1069,142 @@ contract SecurityReviewTest is Test {
         assertEq(bounded.dailySpent(), 1 ether, "new day starts from zero, then records its spend");
         assertEq(bounded.lastSpendingResetDay(), 1, "reset advanced on the first execution");
         assertEq(address(target).balance, 2 ether, "full cap available on the new day");
+    }
+
+    // ------------------------------------------- ERC-20 accounting boundaries (M3)
+
+    /// `approve` moves no balance, so no before/after reading of the executor's balance could
+    /// price it, and the pull that spent the allowance landed in a later transaction the
+    /// executor never saw. That is why it was pinned: it was an accounting problem, not a
+    /// signature problem.
+    ///
+    /// Current behaviour: the Intent is refused with `TokenCallForbidden`, no allowance
+    /// exists, and no nonce is consumed.
+    function test_ApproveIsRefusedAndCreatesNoAllowance() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+        MockToken token = new MockToken();
+        token.mint(address(bounded), 1_000e18);
+        bounded.addTarget(address(token));
+        bounded.addMeteredToken(address(token), 100e18);
+
+        address thief = makeAddr("approve-thief");
+        uint256 balanceBefore = token.balanceOf(address(bounded));
+
+        Pattern1_PlannerExecutor.Intent memory grant = _intent(
+            address(token),
+            0,
+            abi.encodeCall(ERC20.approve, (thief, 1_000e18)),
+            0,
+            block.timestamp + 1 hours
+        );
+
+        vm.expectRevert(Pattern2_BoundedAutonomy.TokenCallForbidden.selector);
+        bounded.execute(grant, _sign(address(bounded), grant));
+
+        assertEq(token.allowance(address(bounded), thief), 0, "no allowance exists");
+        assertEq(
+            token.balanceOf(address(bounded)),
+            balanceBefore,
+            "and no balance moved"
+        );
+        assertEq(bounded.nonce(), 0, "a refused intent consumes no nonce");
+    }
+
+    /// An allowance that already exists when the bounded policy is first relied on is not
+    /// something the executor observes: the spend happens with no Intent, so no nonce is
+    /// consumed and no counter moves. Revocation is a migration prerequisite, not an
+    /// in-contract guarantee, and it is a different state from the one above.
+    function test_PreExistingAllowanceIsPulledWithoutAnyExecution() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+        MockToken token = new MockToken();
+        token.mint(address(bounded), 1_000e18);
+        bounded.addTarget(address(token));
+
+        address spender = makeAddr("pre-existing-spender");
+
+        // State at activation time, not a call the agent is able to make.
+        vm.prank(address(bounded));
+        token.approve(spender, 1_000e18);
+
+        uint256 nonceBefore = bounded.nonce();
+
+        vm.prank(spender);
+        token.transferFrom(address(bounded), spender, 1_000e18);
+
+        assertEq(token.balanceOf(spender), 1_000e18, "pulled outside any execution");
+        assertEq(bounded.nonce(), nonceBefore, "no Intent was consumed");
+        assertEq(bounded.dailySpent(), 0, "there is no execution to charge");
+    }
+
+    /// The loss does not require the token to be the target: a target that pulls with
+    /// `transferFrom` moves the executor's balance inside the executed call. This is the path
+    /// a balance reading would see, and the scenario has to exist as a test before that
+    /// accounting can be claimed.
+    function test_IndirectPullDuringExecutionIsNotCharged() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+        MockToken token = new MockToken();
+        PullRouter router = new PullRouter();
+        token.mint(address(bounded), 1_000e18);
+
+        vm.prank(address(bounded));
+        token.approve(address(router), 1_000e18);
+        bounded.addTarget(address(router));
+
+        Pattern1_PlannerExecutor.Intent memory pull = _intent(
+            address(router),
+            0,
+            abi.encodeCall(PullRouter.pull, (token, address(bounded), 1_000e18)),
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(pull, _sign(address(bounded), pull));
+
+        assertEq(token.balanceOf(address(router)), 1_000e18, "the executed call moved the tokens");
+        assertEq(token.balanceOf(address(bounded)), 0, "the executor paid");
+        assertEq(bounded.dailySpent(), 0, "no token charge exists to apply");
+    }
+
+    /// Net decrease and gross outflow are different numbers. Here 100e18 leaves and 90e18
+    /// returns within one execution: the executor is 10e18 poorer, and 10e18 is all a
+    /// before/after reading can charge. Bounding volume instead of loss would need per-call
+    /// deltas and is a different guarantee, not a detail of this one.
+    function test_OutAndBackLeavesTenUnitLossWithinOneExecution() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+        MockToken token = new MockToken();
+        RebateRouter rebate = new RebateRouter();
+        token.mint(address(bounded), 100e18);
+        token.mint(address(rebate), 90e18);
+
+        vm.prank(address(bounded));
+        token.approve(address(rebate), 100e18);
+        bounded.addTarget(address(rebate));
+
+        Pattern1_PlannerExecutor.Intent memory roundtrip = _intent(
+            address(rebate),
+            0,
+            abi.encodeCall(RebateRouter.run, (token, 100e18, 90e18)),
+            0,
+            block.timestamp + 1 hours
+        );
+        bounded.execute(roundtrip, _sign(address(bounded), roundtrip));
+
+        assertEq(token.balanceOf(address(bounded)), 90e18, "100e18 left and 90e18 came back");
+        assertEq(token.balanceOf(address(rebate)), 100e18, "the router kept the 10e18 difference");
+        assertEq(bounded.dailySpent(), 0, "no token charge exists to apply");
+    }
+
+    /// The documentation says the executor implements no ERC-1271. That is what this asserts:
+    /// the selector is absent. It does not assert that every `permit` variant is closed. Paths
+    /// that need ERC-1271 validation are blocked by this absence; token-specific permit or
+    /// authorization mechanisms are a separate review and are not claimed here.
+    function test_ExecutorDoesNotImplementERC1271() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+
+        (bool ok, bytes memory returndata) = address(bounded).staticcall(
+            abi.encodeWithSelector(0x1626ba7e, bytes32(0), hex"")
+        );
+
+        assertFalse(ok, "isValidSignature(bytes32,bytes) must not be answered");
+        assertEq(returndata.length, 0, "and nothing is returned for it");
     }
 }

@@ -99,6 +99,9 @@ Extends Pattern 1 with additional execution constraints.
 
 - Admin-managed target allowlist.
 - Daily spending cap based on `intent.value`.
+- A separate daily cap per registered token, applied to direct, standard ERC-20 `transfer`
+  calls from the executor; `approve`, `increaseAllowance` and `transferFrom` are refused on
+  that path.
 - Emergency stop and resume controls.
 - Spending accounting before the external execution call.
 
@@ -112,7 +115,7 @@ A targeted adversarial test checks an attempt to bypass the daily cap through re
 
 **Limitations:**
 
-- The daily cap tracks native currency represented by `intent.value`; it does not account for ERC-20 transfers or other token exposure.
+- The native daily cap tracks `intent.value` only. A separate per-token cap bounds a direct `transfer` of a registered token by its declared amount; token movement outside that path — a pre-existing allowance, or a target that pulls with `transferFrom` — is bounded by neither cap.
 - Administration is centralized in a single `immutable` admin address; there is no transfer or renounce path, so losing the key permanently loses administrative control.
 - Multisig administration and timelocked changes are not implemented.
 - The allowlist restricts destination addresses but does not validate the safety of individual functions or calldata.
@@ -271,6 +274,7 @@ The project explores several complementary controls:
 | Expiration | Intent deadline |
 | Target restriction | Pattern 2 allowlist |
 | Spending restriction | Pattern 2 daily native-asset cap |
+| Token spending restriction | Pattern 2 per-token daily cap on direct transfers of registered tokens |
 | Emergency control | Pattern 2 stop/resume |
 | Agent participation | Pattern 3 registration and voting |
 | Proposal quorum | Pattern 3 proposal-specific quorum |
@@ -289,7 +293,7 @@ The Python signer includes input validation and a mainnet signing guard. Mainnet
 - A valid signed Intent may be submitted by another party.
 - Long deadlines increase the period during which an Intent can be submitted.
 - Pattern 1 permits arbitrary targets unless additional restrictions are implemented.
-- Pattern 2's daily cap only tracks native currency represented by `intent.value`.
+- Pattern 2's native daily cap only tracks `intent.value`; its per-token cap covers direct transfers of registered tokens only, and is a declared-amount bound rather than a balance guarantee.
 - Pattern 2 uses centralized administration.
 - Pattern 3 relies on an authoritative arbiter.
 - Pattern 3 does not implement target allowlisting or spending limits.
@@ -312,7 +316,7 @@ This repository is an educational reference for the patterns that connect an AI 
 
 It is not an independently audited codebase and it is not ready for production use. The tests and the static-analysis results in `docs/security.md` show that specific, named scenarios behave as documented. They do not prove the absence of vulnerabilities, and no such guarantee is made — passing tests and a curated Slither report are evidence about the scenarios that were exercised, not a statement about every reachable state.
 
-Using these patterns with real funds requires, at minimum: an independent security review, stronger access control than a single `immutable` admin, a multisig and/or timelock for administrative actions, and coverage for the transfer of ERC-20 assets, which the daily native-asset cap does not track.
+Using these patterns with real funds requires, at minimum: an independent security review, stronger access control than a single `immutable` admin, a multisig and/or timelock for administrative actions, and coverage for the transfer of ERC-20 assets: the per-token cap covers a direct `transfer` of a registered token only, and an allowance that already exists bypasses it.
 
 ## Repository Status
 
@@ -349,7 +353,7 @@ no deployment are required; only the first dependency install needs network acce
 
 ```bash
 git submodule update --init --recursive
-forge test                                   # 82 Solidity tests
+forge test                                   # 110 Solidity tests
 python -m pip install -r requirements.txt    # first run only
 python -m unittest discover -s tests -v      # 7 Python tests
 ```
@@ -357,7 +361,7 @@ python -m unittest discover -s tests -v      # 7 Python tests
 Expected tail of the Solidity run:
 
 ```text
-Ran 8 test suites in 20.27s (20.86s CPU time): 82 tests passed, 0 failed, 0 skipped (82 total tests)
+Ran 9 test suites in 29.13s (29.66s CPU time): 110 tests passed, 0 failed, 0 skipped (110 total tests)
 ```
 
 Expected tail of the Python run:
@@ -373,9 +377,10 @@ What each suite is worth running for:
 | Command | What it pins |
 |---|---|
 | `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
-| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, ERC-20 transfers bypassing the native cap, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
+| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, the ERC-20 transfer bound, the refused `approve`, a pre-existing allowance, an indirect pull through an allowlisted target, net-versus-gross outflow, the absent ERC-1271, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
+| `forge test --match-path test/TokenControls.t.sol` | the metered-token path: `approve`, `increaseAllowance` and `transferFrom` refused on a registered token, an unregistered token refused, the declared amount charged to a per-token daily cap, the charge rolled back with the transfer, malformed calldata, the three failing return shapes (`false`, empty, non-boolean), a zero cap stopping a token, a cap that survives target removal, and the duplicated deadline and nonce rules |
 | `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
-| `forge test --match-path test/Pattern2Invariant.t.sol` | sequence-level invariants over random days, values, cap changes and pause/resume: no execution leaves the recorded spend above the cap in force at that moment, none succeeds while paused, the nonce advances once per successful execution, and the balance matches the outflow the target actually received (256 runs, 128k calls) |
+| `forge test --match-path test/Pattern2Invariant.t.sol` | sequence-level invariants over random days, values, cap changes, pause/resume and token transfers: no execution leaves the recorded spend above the cap in force at that moment, none succeeds while paused, the nonce advances once per successful execution, the balance matches the outflow the target actually received, and today's token spend never exceeds a non-zero token cap (256 runs, 128k calls) |
 | `forge test --match-path test/AttackComparison.t.sol` | the same stolen-key attack against all three patterns: Pattern 1 drains at once, Pattern 2 is held to the cap and then drained over days, Pattern 3 needs a second agent |
 | `python -m unittest discover -s tests -v` | EIP-712 digest parity between the Python signer and the Solidity contract |
 
@@ -440,18 +445,24 @@ Passing tests demonstrate that the tested scenarios behave as expected. They do 
 
 ### Mutation Checks
 
-Two targeted mutations were applied to `contracts/Pattern2_BoundedAutonomy.sol` to check that the tests fail when the accounting they depend on is removed.
+Five targeted mutations were applied to `contracts/Pattern2_BoundedAutonomy.sol` to check that the tests fail when the accounting they depend on is removed.
 
 | Mutation | Temporary change | Failing tests |
 |---|---|---|
 | M1 | removed `dailySpent += intent.value` | 14 |
 | M2 | removed `dailySpent = 0` in the daily reset | 6 |
+| M3 | removed `tokenSpentToday[token] += amount` | 8 |
+| M4 | removed the `intent.data.length != 68` check | 1 |
+| M5 | removed the `returned != 1` check on the token's return value | 2 |
 
 - **M1** showed that recording spend is what the accounting assertions actually guard. With the line gone, 14 tests failed — including the fuzz cases that compare `dailySpent` against the value actually transferred — while the tests that only assert a revert above the cap stayed green. The two layers are independent: bounding a single transaction does not prove that spend is recorded.
 - **M2** showed that the daily reset is what makes the cap available again. Six tests failed; five of them reverted with `SpendingCapExceeded()` before any assertion ran, because yesterday's spend was still counted. A reset that forgets to clear the counter is a functional bug, not a cosmetic one.
-- After each mutation the original contract was restored, `git diff -- contracts/Pattern2_BoundedAutonomy.sol` was empty, and the full suite passed again (82 tests, 0 failures).
+- **M3** showed that the charge line *is* the token bound: with it gone, eight tests failed, including the shared-budget case, the moved-token cases and the recorded event, and none of the revert assertions caught it — they only bound a single call.
+- **M4** left exactly one failure, `test_MalformedTokenCallReverts`. That is the only test pinning the length rule, which is the right shape: one line, one assertion.
+- **M5** left two failures, the `false` and non-boolean returns. The empty-return case still failed on the length check, so it is pinned by a different line and the two mutations are independent.
+- After each mutation the original file was restored, its checksum matched the pre-mutation copy, and the full suite passed again (110 tests, 0 failures).
 
-These are two targeted mutations, not a mutation-testing campaign. They show that these two lines are covered by tests; they do not show that every reachable defect would be caught.
+These are five targeted mutations, not a mutation-testing campaign. They show that these lines are covered by tests; they do not show that every reachable defect would be caught.
 
 ### One Attack, Three Patterns
 

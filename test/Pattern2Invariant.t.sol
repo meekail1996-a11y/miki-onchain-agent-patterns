@@ -15,12 +15,29 @@ contract InvariantTarget {
     }
 }
 
+/// @notice A standard ERC-20 shape for the metered handler actions.
+contract MeteredTestToken {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
 /// @notice Drives Pattern 2 with signed Intents across random values and days.
 /// The fuzz suite checks single calls; this drives sequences, which is where the
 /// day reset, the nonce and the accounting have to stay consistent together.
 contract Pattern2Handler is Test {
     Pattern2_BoundedAutonomy public immutable bounded;
     InvariantTarget public immutable target;
+    address public immutable token;
+    address public immutable tokenRecipient;
     address public immutable stranger;
     address public immutable signer;
     address public immutable admin;
@@ -33,10 +50,16 @@ contract Pattern2Handler is Test {
     uint256 public ghost_pauses;
     uint256 public ghost_executionsWhilePaused;
     uint256 public ghost_capViolationsAtExecution;
+    uint256 public ghost_tokenTransfers;
+    uint256 public ghost_tokenSpent;
+    uint256 public ghost_tokenCapChanges;
+    uint256 public ghost_tokenCapRejections;
 
     constructor(
         Pattern2_BoundedAutonomy _bounded,
         InvariantTarget _target,
+        address _token,
+        address _tokenRecipient,
         address _stranger,
         address _signer,
         address _admin,
@@ -44,6 +67,8 @@ contract Pattern2Handler is Test {
     ) {
         bounded = _bounded;
         target = _target;
+        token = _token;
+        tokenRecipient = _tokenRecipient;
         stranger = _stranger;
         signer = _signer;
         admin = _admin;
@@ -154,6 +179,46 @@ contract Pattern2Handler is Test {
         bounded.emergencyStop(paused);
         ghost_pauses++;
     }
+
+    /// @notice A signed Intent that moves the registered token to a fixed recipient.
+    /// @dev The nonce is shared with the native path, so a successful transfer counts as an
+    /// execution there too.
+    function transferToken(uint96 amount, uint8 dayJumps) external {
+        amount = uint96(bound(amount, 0, 200 ether));
+        vm.warp(block.timestamp + bound(dayJumps, 0, 2) * 1 days);
+
+        Pattern1_PlannerExecutor.Intent memory intent = Pattern1_PlannerExecutor.Intent({
+            target: token,
+            value: 0,
+            data: abi.encodeWithSelector(
+                bytes4(0xa9059cbb),
+                tokenRecipient,
+                uint256(amount)
+            ),
+            nonce: bounded.nonce(),
+            deadline: block.timestamp + 1 hours
+        });
+
+        try bounded.execute(intent, _sign(intent)) {
+            ghost_executions++;
+            ghost_tokenTransfers++;
+            ghost_tokenSpent += amount;
+        } catch {
+            ghost_blocked++;
+        }
+    }
+
+    /// @notice The admin stops, restores or raises a token's budget between executions.
+    /// @dev A refusal is expected and counted: a positive cap below today's spend must be
+    /// rejected, and that rejection is how the published invariant is kept true.
+    function changeTokenCap(uint96 newCap) external {
+        vm.prank(admin);
+        try bounded.setTokenCap(token, bound(newCap, 0, 300 ether)) {
+            ghost_tokenCapChanges++;
+        } catch {
+            ghost_tokenCapRejections++;
+        }
+    }
 }
 
 /// @notice Invariants over sequences of executions, not single calls.
@@ -163,6 +228,7 @@ contract Pattern2InvariantTest is Test {
 
     Pattern2_BoundedAutonomy private bounded;
     InvariantTarget private target;
+    MeteredTestToken private meteredToken;
     Pattern2Handler private handler;
     address private signer;
     uint256 private signerKey;
@@ -174,9 +240,16 @@ contract Pattern2InvariantTest is Test {
         bounded.addTarget(address(target));
         vm.deal(address(bounded), FUNDING);
 
+        meteredToken = new MeteredTestToken();
+        meteredToken.mint(address(bounded), 10_000e18);
+        bounded.addTarget(address(meteredToken));
+        bounded.addMeteredToken(address(meteredToken), 100 ether);
+
         handler = new Pattern2Handler(
             bounded,
             target,
+            address(meteredToken),
+            makeAddr("tokenRecipient"),
             makeAddr("stranger"),
             signer,
             bounded.admin(),
@@ -212,6 +285,21 @@ contract Pattern2InvariantTest is Test {
             0,
             "an execution succeeded while paused"
         );
+    }
+
+    /// @notice The metered budget holds in every state the sequence reaches: for a token with
+    /// a non-zero cap, today's spend never exceeds it. A zero cap is a stop, which is
+    /// stronger than the bound and therefore not a violation.
+    function invariant_TokenSpendNeverExceedsCap() public view {
+        address token = handler.token();
+        uint256 cap = bounded.tokenCapPerDay(token);
+        if (cap == 0) return;
+
+        uint256 spent = block.timestamp / 1 days > bounded.lastTokenResetDay(token)
+            ? 0
+            : bounded.tokenSpentToday(token);
+
+        assertLe(spent, cap, "token spend exceeds the cap in force");
     }
 
     /// @notice The ether that left the contract equals the ether the tests saw arrive.

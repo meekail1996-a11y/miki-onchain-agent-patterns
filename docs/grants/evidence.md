@@ -125,7 +125,7 @@ non-allowlisted executions, cap changes, day jumps and pause/resume all active.
 
 | Gap | Pinned by | Reproduce |
 |---|---|---|
-| ERC-20 transfers bypass the native-asset daily cap | `test_TokenTransfersAreNotBoundedByTheNativeCap` (`test/SecurityReview.t.sol`) | `forge test --match-test test_TokenTransfersAreNotBoundedByTheNativeCap` |
+| A registered token's direct `transfer` is bounded by its own daily cap; movement outside that path (a pre-existing allowance, a target that pulls with `transferFrom`) bypasses both caps | `test_TokenTransfersAreBoundedByTheirOwnCap` (`test/SecurityReview.t.sol`) | `forge test --match-test test_TokenTransfersAreBoundedByTheirOwnCap` |
 | Malleable signatures would be accepted without the `ECDSA` library's high-`s` rejection | `test_RejectsMalleableHighSSignature` (`test/SecurityReview.t.sol`) | `forge test --match-test test_RejectsMalleableHighSSignature` |
 
 ## Documentation integrity

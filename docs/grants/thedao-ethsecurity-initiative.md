@@ -4,8 +4,10 @@ Working draft for https://initiatives.thedao.fund/submit. The round is open from
 September 15, 2026 with no published closing date; the directory lists it as running to
 January 31, 2027. Fill the `TODO` fields before submitting.
 
-This draft is written against the shipped `v0.1.8` state
+The baseline is the shipped `v0.1.8` state
 (https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.8).
+M3 v1 is implemented in the local working tree. Its 110-test, 9-suite validation passes
+locally. It has not yet been committed, merged, tagged, or validated by CI.
 It deliberately separates **what exists** from **what the grant would fund**, because most
 of what an earlier draft promised as future work is already merged and tested.
 
@@ -21,10 +23,13 @@ Hardening an executable security reference for AI-agent smart contracts
 
 ## One-line summary
 
-The reference is public and tested at `v0.1.8`; this grant funds the four gaps the
-repository documents about itself — an independent review, a mutation-testing campaign,
-ERC-20 exposure, and key rotation — so that the evidence behind it stops depending on one
-author's judgement.
+The reference is public and tested at `v0.1.8`, and a metered ERC-20 transfer path is
+implemented in the local working tree; this grant funds the three gaps the repository
+documents about itself — an independent review, a mutation-testing campaign, and key
+rotation — plus the second version of that ERC-20 work: allowance exposure, controlled
+router support, the migration and revocation tooling, and an independent review of v1.
+The point is that the evidence behind the reference stops depending on one author's
+judgement.
 
 ## Category
 
@@ -32,16 +37,18 @@ Audits & Analysis (secondary: Fuzzing & Testing)
 
 ## What already exists
 
-Shipped, tagged, and reproducible from a fresh clone. Nothing in this section is proposed
-work.
+Shipped, tagged, and reproducible from a fresh clone, except where a row says otherwise.
+Nothing in this section is proposed work, and a row labelled local is evidence of what the
+author can build, not a shipped capability.
 
 | Component | State |
 |---|---|
 | Three reference contracts (planner/executor, bounded autonomy, multi-agent arbitration) | Merged, `v0.1.8` |
-| Solidity suite | 82 tests in 8 suites, green in CI |
-| Sequence-level invariants | 4 invariants, 256 runs, 128,000 handler calls, every handler action succeeding |
+| Solidity suite | 110 tests in 9 suites, green locally; the last CI run covers the 82-test `v0.1.8` state |
+| Metered ERC-20 transfer path (M3 v1) | Implemented in the local working tree; 23 of those tests cover it; not committed, merged, tagged or CI-validated |
+| Sequence-level invariants | 5 invariants, 256 runs, 128,000 handler calls, every handler action succeeding (measured locally) |
 | Python EIP-712 signer and digest-parity tests | 7 tests, green in CI |
-| Mutation checks | 2 targeted mutations recorded (14 and 6 failing tests), plus 2 on the invariants |
+| Mutation checks | 5 targeted mutations recorded (14, 6, 8, 1 and 2 failing tests), plus 2 on the invariants; measured locally, not in CI |
 | Static analysis | Slither findings with an explicit disposition for each, including the unfixed ones |
 | Architecture, threat model, limitations | [`docs/architecture.md`](../architecture.md), [`docs/security.md`](../security.md), [`docs/patterns.md`](../patterns.md) |
 | CI | 4 jobs on every push: Solidity, Python, release harness, documentation guard |
@@ -70,53 +77,161 @@ Every item below is a gap the repository names about itself. None of it is built
 
 ### M1 — Independent review of the three contracts ($6,000, 40%)
 
-A Solidity reviewer outside this project reads the contracts against the documented
-controls and publishes findings with a disposition for each, in the same format as the
-existing Slither table. Deliverable: a review report plus either a code change or a written
-justification per finding.
-
 This is the item that matters most, because today every claim in the repository is
 self-assessed. No amount of additional self-testing removes that.
 
-Scope, stated so the number is defensible: this is a review of three contracts by one
-independent reviewer, **not** a full audit engagement — no protocol-level threat model, no
-infrastructure or operational review, no formal verification. The $6,000 is a review-sized
-budget, and if the quotes for that scope come back higher, the milestone is re-scoped to
-fit rather than padded to match a quote.
+**In scope, stated so the number is defensible.** `contracts/Pattern1_PlannerExecutor.sol`,
+`contracts/Pattern2_BoundedAutonomy.sol` and `contracts/Pattern3_MultiAgentArbitration.sol`,
+read at the commit the milestone starts from, with `test/SecurityReview.t.sol` supplied to
+the reviewer as the map of what is already asserted — the reviewer's job is to find what
+those tests miss, not to re-derive them. The reviewer reads against the controls the
+repository claims (domain-separated signatures, nonce rules, allowlist, daily cap, pause
+precedence, quorum and arbiter paths) and says where a claim is weaker than it reads.
+
+**Explicitly out of scope:** the Python signer, the CI workflows, deployment and operational
+security, gas, and formal verification. This is one independent reviewer over three files,
+**not** a protocol audit, and no milestone in this application should be read as one.
+
+**Definition of done.** The review is delivered when every finding carries one of four
+outcomes: fixed in this milestone, fixed in a named later milestone, accepted as a risk with
+a written justification added to `docs/security.md`, or rejected as not-a-finding with the
+reason stated. A finding closed as "won't fix" without that sentence is an undelivered
+finding, and the milestone stays open. The report is published in the repository with the
+reviewer's name attached.
+
+If quotes for this exact scope come back higher, the milestone is re-scoped — fewer
+contracts, or a narrower question — rather than padded to match a quote.
 
 ### M2 — Mutation-testing campaign ($3,000, 20%)
 
 The README records two targeted mutations, explicitly described as "not a mutation-testing
-campaign". This milestone replaces that sentence with a campaign: a scripted run of
-contract-level mutations (drop a check, invert a comparison, skip a state update) with a
-table of which tests and which invariants caught each one. Deliverable: the script, the
-report, and the guarantee that a mutation which survives is either killed with a new test
-or written down as a known hole.
+campaign". This milestone replaces that sentence with one, at a size a reviewer can check.
 
-### M3 — ERC-20 exposure ($4,000, 27%)
+**Fixed count and classes.** At least 30 mutants across at least six classes: delete a
+guard, invert a boolean condition, move an inequality boundary (`>` to `>=` and back), drop
+a state update, reorder two checks whose ordering is documented (the pause-before-allowlist
+order is the known case), and remove an event emission. Each mutant is a single-line edit
+applied to a scratch copy, the full suite plus the four invariants run against it, and the
+outcome recorded as killed-by (which tests, which invariant) or survived.
 
-`dailySpent` tracks native value only; a token transfer through an allowlisted target
-bypasses the cap entirely, and a test asserts exactly that
-(`test/SecurityReview.t.sol:test_TokenTransfersAreNotBoundedByTheNativeCap`). This milestone
-designs and implements token-aware limits (per-token accounting or a documented
-token-allowlist policy), with the same adversarial coverage the native path has. Deliverable:
-contract change, tests, and a written note on why the chosen accounting cannot be gamed by
-an allowance or a fee-on-transfer token.
+**Deliverable.** The script that applies and reverts each mutant, and a report table with
+one row per mutant. Every survivor resolves one of two ways: a new test that kills it, or a
+row under a new "mutation survivors" heading in `docs/security.md` stating whether the
+mutant is behaviourally equivalent (and why) or a real uncovered behaviour. Survivors left
+unexplained do not count as delivered.
+
+**Honest bound.** These are hand-written contract-level mutants; the deliverable is not a
+mutation score. A percentage over a chosen mutant list measures the list as much as the
+suite, so the report gives the table, not a headline number.
+
+### M3 — ERC-20 exposure: v2, migration tooling and review of v1 ($4,000, 27%)
+
+The repository shipped with a documented gap: `dailySpent` tracks native value only, so a
+token movement through an allowlisted target bypassed the native cap. **Version 1 of the
+metered path closes one call shape inside that gap, and it is implemented in the local
+working tree.** It is evidence of what the author can deliver, not work this milestone
+charges for.
+
+**What v1 does, at the width of the guarantee.** A token registered with `addMeteredToken`
+can be paid only by a direct, standard ERC-20 `transfer` issued by the executor, and the
+declared amount is charged against that token's own daily cap before the call is made.
+`approve`, `increaseAllowance` and `transferFrom` are refused on the target; a `transfer` on
+a token that was never registered is refused; calldata that is not exactly two words is
+refused; and a return value that is not a single `true` word is a failure rather than a
+success. The bound is on **declared amounts of direct transfers of standard tokens**;
+fee-on-transfer and rebasing behaviour, and any movement outside this path, are outside it.
+The registry is append-only, and a zero cap is the stop switch
+(`test/SecurityReview.t.sol:test_TokenTransfersAreBoundedByTheirOwnCap` records the shape).
+
+**What v1 does not do, and what this milestone funds.** Three things stay open, and none of
+them is claimed as delivered:
+
+- **Allowance exposure.** The executor cannot enumerate or revoke the allowances granted to
+  it, and an allowance that already existed when the policy was first relied on can still be
+  spent outside any Intent. Today that is a migration prerequisite, not a control.
+- **Routers and aggregators.** `transferFrom` is never executed, so the common pull-payment
+  shape is not supported at all. Supporting it safely needs an exposure ledger, not a
+  selector allowlist.
+- **Migration and revocation tooling.** An operator has no supported way to find and revoke
+  the allowances an executor has granted, which is exactly the step the guarantee depends on.
+
+**Why v1's shape was chosen, and why it is not the whole answer.** The executor forwards
+calldata and does not know what the target does with it, so a token limit cannot simply
+increment from `intent.value`. Declared-amount accounting is cheap and honest about its
+width; a measured-delta design would see pull payments but makes correctness depend on what
+the token does to balances. v1 ships the first, refuses the selector that would make the
+second invisible, and leaves the ledger design to v2 rather than implying it is covered.
+
+**Deliverable.** A second version of the metered path with an allowance-exposure ledger and
+a documented, tested answer for router-mediated transfers; a migration tool that enumerates
+and revokes outstanding allowances; adversarial tests in the same style as v1's 23,
+including the two cases that record the current hole
+(`test_PreExistingAllowanceIsPulledWithoutAnyExecution` and
+`test_IndirectPullDuringExecutionIsNotCharged`); and an independent review of v1 and v2
+inside the review scope M1 defines. The branch this milestone does not build is written into
+Future Work rather than implied.
+
+**Why the milestone survived the gap partly closing.** v1 shows the shape of the solution and
+its ceiling. v2 is the part that needs the ledger design, the tooling and a second pair of
+eyes — which is what a single author cannot produce alone. The $4,000 buys that, not a path
+that already exists.
 
 ### M4 — Key rotation and administrative hardening ($2,000, 13%)
 
-`agentSigner`, `admin` and `arbiter` are `immutable`, so a lost key means a new deployment.
-Deliverable: a design document for rotation (multisig or timelocked admin, arbiter transfer)
-with the migration order spelled out, plus a reference implementation for at least the admin
-path and tests for the failure mode where rotation happens mid-proposal.
+Rotation is not one problem here, and the milestone is scoped by which key it is:
+
+| Key | Where it is immutable | What it can do | Deliverable |
+|---|---|---|---|
+| `agentSigner` | `Pattern1`, inherited by patterns 2 and 3 | Authorise every intent | Code and tests |
+| `admin` | `Pattern2` | Widen the allowlist, raise the cap, pause | Code and tests |
+| `arbiter` | `Pattern3` | Add and remove agents, resolve proposals | Code, or a documented procedure if code would disturb pending proposals |
+
+The Pattern 3 agent set is already mutable through `addAgent` and `removeAgent`; this
+milestone does not re-open that, except where rotation changes its interaction with
+`agentEpoch` and quorum.
+
+**Required tests for whichever paths ship as code:** an intent signed by the previous
+`agentSigner` does not execute after rotation; a queued future nonce — behaviour currently
+pinned by `test_QueuedFutureNonceExecutesAfterEarlierIntent` — has its post-rotation
+treatment decided explicitly and tested rather than left to fall out of the implementation;
+rotation while paused does not strand the contract; and the event trail identifies who
+rotated, to what, and on whose authority.
+
+**Arbiter path:** if rotation is delivered as a procedure rather than code, the design
+document must argue why — the pending-proposal and reserved-nonce rules (`test_SquattedNonceStallsPipelineUntilArbiterRejects`) are the reason this is not free — and the procedure
+must state the order: pause, rotate, confirm, resume, plus what each step guarantees if it
+fails halfway.
+
+**Deliverable:** the design document with that ordering, the implementation for at least
+`agentSigner` and `admin`, and the tests above. If the honest conclusion is that some key
+should be rotated by redeploying and migrating instead, the deliverable is the documented
+procedure and the argument for it — the same standard the Risks section already sets.
+
+## Future Work
+
+Recorded here so that a proposal is never mistaken for a shipped capability.
+
+- **Branch 2 — allowance exposure ledger.** Charge an Intent for the lifetime exposure an
+  allowance represents, instead of for the transfer that happens inside the call. It is the
+  only design that can see a pull, and it is what M3 v2 evaluates. It is not implemented
+  today.
+- **Router and aggregator support.** Deliberately absent from v1: a router calls
+  `transferFrom` from inside its own frame, so the executor observes neither the token nor
+  the amount. Adding it means bounding exposure, not allowing a selector.
+- **Non-standard token behaviour.** Fee-on-transfer, rebasing, and tokens that do not return
+  a single `true` word remain outside the guarantee. v1 refuses the last category rather than
+  tolerating it.
+- **Allowance revocation as a contract feature.** Today it is an operational step during
+  migration. Making it a control needs a way to enumerate spenders, which the ERC-20
+  interface does not offer.
 
 ## Why this scope
 
 The reference exists. Asking a fund to pay for it again would be dishonest, and a reviewer
 who reads the repository would see that immediately. What a single author cannot produce
 alone is exactly what is listed: an outside opinion, a systematic instead of anecdotal
-mutation record, coverage of a value path the code currently ignores, and a rotation design
-that trades away `immutable`'s simplicity.
+mutation record, the second version of a value path the code bounds for one call shape
+today, and a rotation design that trades away `immutable`'s simplicity.
 
 ## Evidence a reviewer can rerun
 
@@ -124,7 +239,7 @@ From a fresh clone, no keys, no deployment:
 
 ```bash
 git submodule update --init --recursive
-forge test                                   # 82 tests, 8 suites
+forge test                                   # 110 tests, 9 suites
 python -m unittest discover -s tests -v      # 7 tests
 bash scripts/verify_all.sh                   # all four CI checks locally
 ```
@@ -132,7 +247,7 @@ bash scripts/verify_all.sh                   # all four CI checks locally
 Expected tail of the Solidity run:
 
 ```text
-Ran 8 test suites in 20.27s (20.86s CPU time): 82 tests passed, 0 failed, 0 skipped (82 total tests)
+Ran 9 test suites in 29.13s (29.66s CPU time): 110 tests passed, 0 failed, 0 skipped (110 total tests)
 ```
 
 The repository's documentation guard is part of CI: a README that quotes a stale test count,
@@ -147,6 +262,8 @@ added after the README was found quoting a figure from before the invariant suit
   every document.
 - No users, integrations, or partnerships: there are none to point at, and inventing them
   would be the fastest way to fail review.
+- No claim that M3 v1 protects ERC-20 holdings in general. It bounds one call shape, and the
+  allowance and router paths listed under Future Work are open.
 
 ## Team
 
@@ -154,7 +271,7 @@ TODO: full name, location, and jurisdiction eligibility. A solo applicant is acc
 this size of ask; the point below is what has been shipped.
 
 - GitHub: [@beshavard_eth](https://github.com/meekail1996-a11y) — owner and sole author of
-  this repository: three contracts, 82 Solidity tests, the Python signer, both CI workflows,
+  this repository: three contracts, 110 Solidity tests, the Python signer, both CI workflows,
   and the documentation set.
 - Twelve years running a school. Relevant as evidence of long-horizon delivery and
   documentation discipline, **not** as security experience — remove this line if you would
@@ -168,7 +285,7 @@ TODO: wallet address (only on the official form, never in this repository).
 |---|---|---|
 | M1 — Independent review of the three contracts | $6,000 | 40% |
 | M2 — Mutation-testing campaign and report | $3,000 | 20% |
-| M3 — ERC-20 limits, design and implementation | $4,000 | 27% |
+| M3 — ERC-20 exposure v2, migration tooling and review of v1 | $4,000 | 27% |
 | M4 — Rotation design and admin hardening | $2,000 | 13% |
 | **Total** | **$15,000** | |
 
@@ -186,9 +303,10 @@ green on new compiler versions, which the existing CI already does.
 
 - This is educational material, not an audit. It will not claim to make any specific
   protocol safe, and the repository states that scope in `Scope and Guarantees`.
-- After M3, token limits will still depend on the target's token behaviour; fee-on-transfer
-  and rebasing tokens are a known source of accounting bugs and will be documented as such
-  rather than claimed as solved.
+- M3 v1's bound covers declared amounts of direct transfers of standard tokens only.
+  Fee-on-transfer and rebasing behaviour, an allowance that predates the policy, and
+  router-mediated pulls are outside it, and are documented as such rather than claimed as
+  solved.
 - M4 may conclude that the safest rotation design is "redeploy and migrate"; if so, the
   deliverable is the documented procedure, not new code.
 - If a milestone slips, the tranche is not released.
@@ -201,7 +319,10 @@ green on new compiler versions, which the existing CI already does.
 - [ ] Confirm eligibility for the applicant's jurisdiction and the fund's terms; several
       Ethereum-ecosystem programs exclude sanctioned jurisdictions and require KYC on the
       recipient. Ask info@thedao.fund before spending time on the form.
-- [ ] Point the application at `v0.1.8`, not `main`: the tag is the state this draft describes.
+- [ ] Point the application at the tag that includes the metered path, not `main`: tags do
+      not move. That tag does not exist yet; until it does, quote `v0.1.8` for the shipped
+      suite and describe M3 v1 exactly as the header does — implemented in the local working
+      tree, green locally, not yet merged or CI-validated.
 - [ ] Pledge the minimum needed for TheDAO's vote; the platform shows that threshold per
       initiative.
 - [ ] Decide whether a second application (Ethereum Foundation ESP, tooling and education)

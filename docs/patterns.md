@@ -52,18 +52,30 @@ The contract includes:
 - A daily spending cap for native asset value.
 - An emergency stop and resume mechanism.
 - Spending accounting before the inherited external execution call, preventing reentrant execution from bypassing the daily cap.
+- A per-token daily cap on direct, standard ERC-20 `transfer` calls from the executor to a
+  registered token, with `approve`, `increaseAllowance` and `transferFrom` refused on that
+  path.
 
 ### Security properties
 
 - Calls to non-allowlisted targets are rejected.
 - Native-value spending is checked against the daily cap.
 - Spending is accounted for before the external call.
+- A registered token's direct `transfer` is charged against that token's own daily cap before
+  the call, and the charge is rolled back with the transfer if the token call fails.
 - Emergency stop can halt execution.
 - A reentrancy guard protects `execute`.
 
 ### Limitations
 
-- The daily cap accounts for `intent.value`; it does not measure ERC-20 transfers or other token-denominated exposure.
+- The native daily cap accounts for `intent.value`; it does not measure ERC-20 transfers or
+  other token-denominated exposure.
+- The per-token cap covers one call shape only: a direct `transfer` on a registered token, by
+  its declared amount. It is not a bound on token balances, and it does not cover fee-on-transfer
+  or rebasing tokens.
+- Token movement outside that path — an allowance that already existed when the policy was
+  first relied on, or a target that pulls with `transferFrom` inside the executed call — is
+  bounded by neither cap.
 - Administrative permissions remain centralized, and the `admin` address is `immutable`: there is no transfer or renounce path, so losing the key permanently loses administrative control.
 - The pattern does not currently provide a multisig or timelock for administrative actions.
 - The target allowlist does not validate the safety of individual functions or calldata on an allowed contract. An allowlisted contract may still expose dangerous or unintended functionality.

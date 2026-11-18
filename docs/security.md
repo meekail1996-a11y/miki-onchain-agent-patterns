@@ -27,6 +27,8 @@ The implementation maps the most relevant threats to concrete on-chain controls:
 | Cross-chain or cross-contract replay | Domain separator binds `chainId` and `verifyingContract` | Pattern 1 |
 | Direct execution bypassing governance | Inherited `execute` overridden to always revert with `DirectExecutionDisabled` | Pattern 3 |
 | Arbitrary target or native-value drain | Admin allowlist and daily native-asset cap checked before the external call | Pattern 2 |
+| ERC-20 transfer of a registered token beyond its budget | Per-token daily cap read and charged before the token call; `transfer` on a token that was never registered is refused | Pattern 2 |
+| An Intent creating or growing an allowance | `approve` and `increaseAllowance` refused, alongside `transferFrom`, on the metered path | Pattern 2 |
 | Reentrancy during execution | Nonce and spending accounting updated before the external call, plus a reentrancy guard on `execute` and on `resolveArbitration` | Pattern 2, Pattern 3 |
 | Approval without sufficient support | Per-proposal quorum snapshot of a strict majority, checked at resolution | Pattern 3 |
 | Late-joining agents voting on older proposals | Per-proposal voter eligibility snapshot (`agentEpoch`) | Pattern 3 |
@@ -56,7 +58,10 @@ so this table cannot quietly rot.
 | Reentrancy cannot raise the cap | `test_ReentrancyCannotExceedDailySpendingCap` | `test/Pattern2.t.sol` |
 | Pause checked before the allowlist | `test_ContractPausedTakesPrecedenceOverTargetNotAllowed` | `test/SecurityReview.t.sol` |
 | Day reset and midnight straddle | `test_DayResetDoesNotAccumulateAcrossIdleDays`, `test_BoundaryStraddleAllowsTwoCapsCloseTogether` | `test/SecurityReview.t.sol` |
-| ERC-20 transfers bypass the native cap (documented) | `test_TokenTransfersAreNotBoundedByTheNativeCap` | `test/SecurityReview.t.sol` |
+| ERC-20 transfers bounded by the token's own daily cap | `test_TokenTransfersAreBoundedByTheirOwnCap` | `test/SecurityReview.t.sol` |
+| `approve` refused on the metered path | `test_ApproveOnMeteredTokenReverts` | `test/TokenControls.t.sol` |
+| A token that was never registered is refused | `test_TransferOfUnregisteredTokenReverts` | `test/TokenControls.t.sol` |
+| An over-cap token transfer leaves no trace | `test_OverCapTokenTransferRevertsAndRollsBack` | `test/TokenControls.t.sol` |
 | Direct execution disabled in Pattern 3 | `test_RevertWhenDirectExecutionIsAttempted` | `test/Pattern3.t.sol` |
 | Arbiter cannot approve below quorum | `test_RevertWhenApprovingWithoutQuorum` | `test/Pattern3.t.sol` |
 | Removed agents cannot vote | `test_RemovedAgentCannotVoteOnExistingProposal` | `test/SecurityReview.t.sol` |
@@ -104,12 +109,75 @@ Known Limitations sections record what each control deliberately leaves uncovere
 
 ### Known Limitations
 
-- The daily spending cap accounts for `intent.value` only. It does not track ERC-20 transfers or other token exposure.
+- The daily native-asset cap accounts for `intent.value` only. On the metered path a direct
+  `transfer` of a registered token is separately bounded by that token's own daily cap; the
+  bound is on the declared amount, and fee-on-transfer, rebasing and non-standard return
+  values are outside it.
+- Token movement outside the metered path is bounded by neither cap: an allowance that
+  already existed when the policy was first relied on, and a target that pulls with
+  `transferFrom` inside the executed call.
 - The cap is per calendar day (UTC) and resets on the first transaction of a new day. Spending the full cap just before midnight and again just after therefore permits up to twice the cap within seconds, while idle days do not accumulate allowance. `test/SecurityReview.t.sol` pins both edges.
 - Administrative authority is centralized and the `admin` address is `immutable`: no multisig or timelock is required, and losing the admin key permanently loses administrative control (pause, allowlist, and spending-cap changes).
 - The target allowlist restricts which contracts can be called, but does not validate the safety of individual functions or calldata sent to an allowed contract.
 - Reentrancy-focused tests cover specific attack scenarios; they do not prove that all possible reentrancy vulnerabilities have been eliminated.
 - Further adversarial testing and independent security review are necessary.
+
+### Metered Token Path
+
+Pattern 2 also enforces a per-token daily cap on one specific call shape: a direct, standard
+ERC-20 `transfer` issued by the executor to a token the admin registered with
+`addMeteredToken`. Three things are separate here and should not be read as one.
+
+- **The bounded operation** is a direct `transfer` on a registered token. The declared amount
+  in the calldata is compared with that token's remaining budget and charged before the call
+  is made, so the guarantee is about the amounts the executor declared, not about the balance
+  change that results. Fee-on-transfer and rebasing tokens are outside it, and a token whose
+  return value is not a single `true` word is refused rather than tolerated.
+- **The refused selectors** are `approve`, `increaseAllowance` and `transferFrom`, on any
+  target. This is what keeps the metered path from creating or spending an allowance, and it
+  is why the allowance route below is a documented prerequisite rather than a control.
+- **The movements outside this path** are bounded by neither cap: an allowance that already
+  existed when the policy was first relied on, and a target that pulls with `transferFrom`
+  inside the executed call. `test_PreExistingAllowanceIsPulledWithoutAnyExecution` and
+  `test_IndirectPullDuringExecutionIsNotCharged` pin both, and both still pass.
+
+Two details that follow from the design rather than from taste:
+
+- **The cap is per token, shared across Intents, and not per target.** Two transfers in the
+  same day draw on one budget, because the token is the unit of exposure, not the call.
+- **A zero cap stops a token.** `setTokenCap(token, 0)` is the stop switch, and it stays
+  available after the token has spent today. A positive cap below today's spend is refused
+  (`TokenCapBelowSpent`), which is what keeps `tokenSpentToday <= tokenCapPerDay` true for
+  every non-zero cap and lets `invariant_TokenSpendNeverExceedsCap` state the property
+  without a carve-out.
+
+The registry is append-only: `addMeteredToken` adds and there is no removal function, so a
+token cannot be quietly dropped from the set a reviewer is reading. Stopping a token is a
+cap change, not a deletion. Registration does not grant reach on its own either — the token
+must already be an allowlisted target, and the same `paused` and allowlist checks run first.
+
+**Selector collisions are closed, not opened.** Any calldata that begins with one of the four
+token selectors is treated as a token call, even if the target is not a token at all; if the
+target is not a registered token the result is `TokenNotRegistered`. A selector collision
+closes the call; it never opens a path. This also means the metered controls are not a
+general ERC-20 capability: routers and aggregators are not supported, and `transferFrom` is
+never executed.
+
+**Order of validation differs between the two paths, deliberately.** The native path runs
+`paused → allowlist → daily cap → deadline / nonce / signature`, because that cap check
+predates the metered work and is left unchanged. The metered path runs
+`paused → allowlist → selector policy → deadline / nonce / signature → per-token cap`, so the
+Intent is authenticated before any budget is consulted. The consequence is real and worth
+stating: on the native path an unsigned Intent can still reveal whether the budget would
+allow a given amount, while on the metered path it cannot. Error precedence differs between
+the two paths for the same reason, and the difference is not claimed to be a defect in
+either; aligning the native path is listed under Future Security Improvements.
+
+**What this path does not do.** The executor cannot enumerate the allowances granted to it
+and cannot revoke them. Revoking an allowance that existed before the policy was relied on is
+a migration prerequisite on the token itself — an operational step, not something the
+contract checks or promises. Nothing here protects a holder's other ERC-20 balances, and
+nothing here is a general support claim for ERC-20 assets or for allowances.
 
 ## Pattern 3 — Multi-Agent Coordination and Arbitration
 
@@ -174,7 +242,7 @@ Slither 0.11.6 was run against the three contracts (forge 1.9.0, solc 0.8.38 as 
 
 ### Test Coverage
 
-`forge coverage` over the current 82-test suite reports **100% of lines** (124/124), 96.00% of statements (120/125), 85.71% of branches (30/35) and 100% of functions across the three contracts, measured with `forge coverage --report summary --no-match-coverage "(test|script)/"` on the pinned solc 0.8.38. Every line of every contract is executed by at least one test.
+`forge coverage` over the current 110-test suite reports **100% of lines** (187/187), 97.58% of statements (202/207), 90.74% of branches (49/54) and 100% of functions across the three contracts, measured with `forge coverage --report summary --no-match-coverage "(test|script)/"` on the pinned solc 0.8.38. Every line of every contract is executed by at least one test.
 
 The remaining gaps are statements and branches in `Pattern3_MultiAgentArbitration` (92.96% of statements, 79.17% of branches): `Pattern1_PlannerExecutor` and `Pattern2_BoundedAutonomy` are fully covered on every metric. An uncovered branch is not automatically a defect — some are unreachable defensive reverts — but a reviewer should read those paths rather than assume they are exercised. Coverage is a coverage metric, not a security guarantee.
 
@@ -235,7 +303,8 @@ This repository is an educational and experimental project.
 
 - It has not undergone an independent professional security audit.
 - It is not production-ready.
-- `test/SecurityReview.t.sol` pins the guarantees that are easy to regress: rejection of malleable (high-`s`) signatures, rejection of signatures bound to another chain, the inclusive deadline boundary, release of a nonce reserved by a proposal that expired before resolution, the arbiter-dependent liveness of a squatted nonce, blocked votes from removed agents, and token transfers escaping the native spending cap.
+- `test/SecurityReview.t.sol` pins the guarantees that are easy to regress: rejection of malleable (high-`s`) signatures, rejection of signatures bound to another chain, the inclusive deadline boundary, release of a nonce reserved by a proposal that expired before resolution, the arbiter-dependent liveness of a squatted nonce, blocked votes from removed agents, a registered token's direct transfer staying inside its
+own cap, and token movement outside that path escaping both caps.
 - Passing automated tests does not guarantee the absence of vulnerabilities.
 - The documented controls reduce specific risks but do not eliminate all smart contract, key-management, operational, or integration risks.
 
@@ -250,6 +319,10 @@ Potential improvements include:
 - A separate agent-admission role, so quorum cannot be minted by the approving arbiter.
 - Explicit expiry or timeout handling for proposals that can no longer reach quorum.
 - Stronger configuration validation.
+- Aligning the native path's validation order with the metered path's, so an unsigned Intent
+  cannot probe the native budget.
+- An operator tool that enumerates and revokes allowances already granted to an executor,
+  since the contract can do neither; today that is a migration-checklist item.
 - Expanded threat modeling.
 - Additional adversarial and invariant testing.
 - Improved monitoring and operational safeguards.

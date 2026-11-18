@@ -6,11 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the project is at `0.x`, breaking changes may land in minor versions.
 
-## [Unreleased]
+## [v0.1.9] - 2026-11-18
+
+A metered ERC-20 path for Pattern 2: a registered token can be paid only by a direct
+standard `transfer`, against that token's own daily cap. The bound is on declared amounts of
+direct transfers of standard tokens; allowances, router pulls and non-standard token
+behaviour are documented as outside it.
+
+### Added
+
+- Metered ERC-20 transfers in `Pattern2_BoundedAutonomy` (M3, first version). A token
+  registered with `addMeteredToken(token, capPerDay)` can only be paid by a direct,
+  standard `transfer` issued by the executor, and the declared amount is charged against
+  that token's own daily cap before the call is made. The guarantee is stated for the
+  declared amounts of successful direct transfers of standard tokens; fee-on-transfer,
+  rebasing and non-standard return values are outside it.
+- `addMeteredToken` requires the token to be an allowlisted target and rejects the zero
+  address or an address with no code (`InvalidToken`). It is idempotent and the registry
+  array only grows: there is no removal function, and `setTokenCap(token, 0)` is how a
+  token is stopped. A positive cap below the day's spend is refused (`TokenCapBelowSpent`),
+  so `tokenSpentToday <= tokenCapPerDay` holds for every non-zero cap.
+- `approve`, `increaseAllowance` and `transferFrom` are refused (`TokenCallForbidden`) on
+  the metered path, with a non-zero `value` refused the same way. `transfer` on a token
+  that was never registered is `TokenNotRegistered`; calldata that is not exactly 68 bytes
+  is `MalformedTokenCall`; a call that reverts, returns fewer or more than 32 bytes, or
+  returns a word other than `1` is `TokenTransferFailed`. `SafeERC20` is deliberately not
+  used, because it accepts an empty return value.
+- The Intent prologue (deadline, nonce, signature, `nonce++`) is duplicated in Pattern 2
+  rather than carved out of Pattern 1, which is unchanged; `Pattern1`'s `_executeIntent`
+  discards the callee's return value, which this path has to read. Two tests pin the
+  deadline and nonce rules on both paths.
+- `test/TokenControls.t.sol` adds 23 tests covering the selectors, registration, the cap,
+  the three failing return shapes, and the duplicated prologue. The suite moves 87 → 110
+  tests and 8 → 9 suites, and the invariant suite gains `invariant_TokenSpendNeverExceedsCap`
+  (4 → 5 invariants).
+- Five adversarial tests in `test/SecurityReview.t.sol` that record what the ERC-20 side of
+  Pattern 2 does *not* bound, so that accounting decisions can be argued from executable
+  cases instead of prose. No contract behaviour changed and none of these is a fix:
+  `test_ApproveCreatesAllowanceAtZeroBalanceDelta` (an `approve` creates an allowance with no
+  balance movement, and the pull that spends it needs no second Intent),
+  `test_PreExistingAllowanceIsPulledWithoutAnyExecution` (an allowance that exists when the
+  policy is first relied on is spent with no execution, so no nonce and no counter moves),
+  `test_IndirectPullDuringExecutionIsNotCharged` (a target that pulls with `transferFrom`
+  moves the executor's balance inside the executed call),
+  `test_OutAndBackLeavesTenUnitLossWithinOneExecution` (100e18 out and 90e18 back leaves a
+  10e18 loss, which is what a before/after reading could charge and is not the gross
+  outflow), and `test_ExecutorDoesNotImplementERC1271` (the `0x1626ba7e` selector is absent,
+  which is the whole claim: token-specific `permit` variants are a separate review).
+  `PullRouter` and `RebateRouter` are the mocks behind them, and the suite grows 82 → 87.
+- Two of those tests were also checked for non-vacuity by breaking the scenario they depend
+  on — zeroing the router's balance and its allowance — confirming both fail, and restoring
+  the file. That is not a mutation campaign: the behaviour they pin is the absence of
+  accounting, and the only change that would flip them is the accounting work itself, which
+  is not built.
 
 ### Changed
 
-- `test/Pattern2Invariant.t.sol` now drives all four handler actions. `changeCap` and
+- `test_ApproveCreatesAllowanceAtZeroBalanceDelta` is now
+  `test_ApproveIsRefusedAndCreatesNoAllowance`: the premise changed by design, so the
+  assertion changed with it rather than the other way round.
+- `test_TokenTransfersAreNotBoundedByTheNativeCap` is now
+  `test_TokenTransfersAreBoundedByTheirOwnCap`, rewritten rather than deleted.
+- `test/Pattern2Invariant.t.sol` gained `transferToken` and `changeTokenCap` handler actions;
+  a successful token transfer also consumes a nonce, so it counts as an execution there.
+- The README mutation section records five targeted mutations instead of two (M3 removed the
+  token charge and failed 8 tests, M4 the length check and failed 1, M5 the return-value
+  check and failed 2).
+- `Pattern2_BoundedAutonomy` is now at 100% of lines, statements, branches and functions.
+- The earlier note in this section stands for the version it describes:
+  `test/Pattern2Invariant.t.sol` now drives all four handler actions. `changeCap` and
   `togglePause` called admin-only functions from the handler, which is not the admin, so
   both reverted on every call (31,895/31,895 and 32,167/32,167 in the trace table) and the
   invariants never observed a cap change or a pause. They are pranked as the admin now, and
@@ -280,7 +344,8 @@ First tagged, presentable version of the reference implementation.
 
 - Not independently audited and **not production-ready**. See `docs/security.md`.
 
-[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.9...HEAD
+[v0.1.9]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.8...v0.1.9
 [v0.1.8]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.6...v0.1.8
 [v0.1.7]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.6...v0.1.7
 [v0.1.6]: https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/compare/v0.1.5...v0.1.6

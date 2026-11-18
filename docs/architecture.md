@@ -10,7 +10,7 @@ behave as described; they do not show the absence of vulnerabilities. See
 [`docs/security.md`](security.md) for the static-analysis findings and the deliberate
 limitations, and [`docs/patterns.md`](patterns.md) for a per-pattern walkthrough.
 
-Evidence at the time of writing: 82 Solidity tests in 8 suites, 4 invariants over 256 runs
+Evidence at the time of writing: 110 Solidity tests in 9 suites, 5 invariants over 256 runs
 and 128,000 handler calls, 7 Python tests, and 4 CI jobs that run on every push to `main`.
 Reproduce all of it with `bash scripts/verify_all.sh`.
 
@@ -174,8 +174,11 @@ Stated so that no reader has to infer it:
   resolves arbitration, and is `immutable`, so a lost arbiter key freezes governance until a
   redeploy. Quorum is snapshotted at proposal time, so removing agents does not lower an
   existing proposal's threshold.
-- **Native value only.** The daily cap tracks native transfers; ERC-20 transfers bypass it
-  (`SecurityReview.t.sol:test_TokenTransfersAreNotBoundedByTheNativeCap`).
+- **Native value only, plus one token path.** The daily cap tracks native transfers. On the
+  metered path a registered token's direct `transfer` is bounded by that token's own daily
+  cap (`SecurityReview.t.sol:test_TokenTransfersAreBoundedByTheirOwnCap`). Anything that
+  moves tokens outside that path — an allowance that already existed at activation time, or a
+  target that pulls with `transferFrom` — is outside both caps.
 - **No upgradeability, no rotation.** `immutable` keys and no proxy: rotation means a new
   deployment and a migration.
 - **Tests are not an audit.** Nothing here has been reviewed by an independent party, and
