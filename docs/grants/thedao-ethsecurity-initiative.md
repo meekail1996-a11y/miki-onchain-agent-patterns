@@ -6,8 +6,8 @@ January 31, 2027. Fill the `TODO` fields before submitting.
 
 The baseline is the shipped `v0.1.8` state
 (https://github.com/meekail1996-a11y/miki-onchain-agent-patterns/releases/tag/v0.1.8).
-M3 v1 is implemented in the local working tree. Its 110-test, 9-suite validation passes
-locally. It has not yet been committed, merged, tagged, or validated by CI.
+M3 v1 is merged to `main`; its 110-test, 9-suite validation passes locally, and the `Tests`
+run on that commit is the CI record rather than a figure quoted here.
 It deliberately separates **what exists** from **what the grant would fund**, because most
 of what an earlier draft promised as future work is already merged and tested.
 
@@ -44,8 +44,8 @@ author can build, not a shipped capability.
 | Component | State |
 |---|---|
 | Three reference contracts (planner/executor, bounded autonomy, multi-agent arbitration) | Merged, `v0.1.8` |
-| Solidity suite | 110 tests in 9 suites, green locally; the last CI run covers the 82-test `v0.1.8` state |
-| Metered ERC-20 transfer path (M3 v1) | Implemented in the local working tree; 23 of those tests cover it; not committed, merged, tagged or CI-validated |
+| Solidity suite | 110 tests in 9 suites, green locally; the CI run on that commit is the first pass that covers the metered path |
+| Metered ERC-20 transfer path (M3 v1) | Merged to `main`; 23 of the suite's tests cover it |
 | Sequence-level invariants | 5 invariants, 256 runs, 128,000 handler calls, every handler action succeeding (measured locally) |
 | Python EIP-712 signer and digest-parity tests | 7 tests, green in CI |
 | Mutation checks | 5 targeted mutations recorded (14, 6, 8, 1 and 2 failing tests), plus 2 on the invariants; measured locally, not in CI |
@@ -128,9 +128,8 @@ suite, so the report gives the table, not a headline number.
 
 The repository shipped with a documented gap: `dailySpent` tracks native value only, so a
 token movement through an allowlisted target bypassed the native cap. **Version 1 of the
-metered path closes one call shape inside that gap, and it is implemented in the local
-working tree.** It is evidence of what the author can deliver, not work this milestone
-charges for.
+metered path closes one call shape inside that gap, and it is merged to `main`.**
+It is evidence of what the author can deliver, not work this milestone charges for.
 
 **What v1 does, at the width of the guarantee.** A token registered with `addMeteredToken`
 can be paid only by a direct, standard ERC-20 `transfer` issued by the executor, and the
@@ -319,10 +318,9 @@ green on new compiler versions, which the existing CI already does.
 - [ ] Confirm eligibility for the applicant's jurisdiction and the fund's terms; several
       Ethereum-ecosystem programs exclude sanctioned jurisdictions and require KYC on the
       recipient. Ask info@thedao.fund before spending time on the form.
-- [ ] Point the application at the tag that includes the metered path, not `main`: tags do
-      not move. That tag does not exist yet; until it does, quote `v0.1.8` for the shipped
-      suite and describe M3 v1 exactly as the header does — implemented in the local working
-      tree, green locally, not yet merged or CI-validated.
+- [ ] Point the application at the `v0.1.9` tag once it is pushed, not `main`: tags do not
+      move. `v0.1.8` describes the suite before the metered path and must not be quoted for
+      the current counts.
 - [ ] Pledge the minimum needed for TheDAO's vote; the platform shows that threshold per
       initiative.
 - [ ] Decide whether a second application (Ethereum Foundation ESP, tooling and education)

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the project is at `0.x`, breaking changes may land in minor versions.
 
+## [Unreleased]
+
 ## [v0.1.9] - 2026-11-18
 
 A metered ERC-20 path for Pattern 2: a registered token can be paid only by a direct

@@ -14,4 +14,6 @@ lcov.info
 !.env.example
 
 venv/
+.venv/
+.tools/
 .DS_Store
