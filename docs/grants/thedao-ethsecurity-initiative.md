@@ -319,9 +319,9 @@ green on new compiler versions, which the existing CI already does.
 - [ ] Confirm eligibility for the applicant's jurisdiction and the fund's terms; several
       Ethereum-ecosystem programs exclude sanctioned jurisdictions and require KYC on the
       recipient. Ask info@thedao.fund before spending time on the form.
-- [ ] Point the application at the `v0.1.9` tag once it is pushed, not `main`: tags do not
-      move. `v0.1.8` describes the suite before the metered path and must not be quoted for
-      the current counts.
+- [ ] Point the application at the `v0.1.9` tag, not `main`: tags do not move, and the
+      release on that tag carries the `CHANGELOG` section. `v0.1.8` describes the suite
+      before the metered path and must not be quoted for the current counts.
 - [ ] Pledge the minimum needed for TheDAO's vote; the platform shows that threshold per
       initiative.
 - [ ] Decide whether a second application (Ethereum Foundation ESP, tooling and education)
