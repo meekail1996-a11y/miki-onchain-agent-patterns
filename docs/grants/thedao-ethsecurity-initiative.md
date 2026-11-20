@@ -135,12 +135,14 @@ It is evidence of what the author can deliver, not work this milestone charges f
 **What v1 does, at the width of the guarantee.** A token registered with `addMeteredToken`
 can be paid only by a direct, standard ERC-20 `transfer` issued by the executor, and the
 declared amount is charged against that token's own daily cap before the call is made.
-`approve`, `increaseAllowance` and `transferFrom` are refused on the target; a `transfer` on
+`approve`, `increaseAllowance` and `transferFrom` are refused when they are the
+top-level selectors of an Intent passed through `execute`, on any target; a `transfer` on
 a token that was never registered is refused; calldata that is not exactly two words is
 refused; and a return value that is not a single `true` word is a failure rather than a
 success. The bound is on **declared amounts of direct transfers of standard tokens**;
 fee-on-transfer and rebasing behaviour, and any movement outside this path, are outside it.
-The registry is append-only, and a zero cap is the stop switch
+The registry is append-only, and a zero cap stops the metered direct-transfer path
+for that token
 (`test/SecurityReview.t.sol:test_TokenTransfersAreBoundedByTheirOwnCap` records the shape).
 
 **What v1 does not do, and what this milestone funds.** Three things stay open, and none of
@@ -218,6 +220,11 @@ Recorded here so that a proposal is never mistaken for a shipped capability.
 - **Router and aggregator support.** Deliberately absent from v1: a router calls
   `transferFrom` from inside its own frame, so the executor observes neither the token nor
   the amount. Adding it means bounding exposure, not allowing a selector.
+- **Token-specific authorization mechanisms.** v1 does not claim to close every token
+  authorization path. ERC-2612 `permit`, signature-based transfer authorizations, and
+  token-specific extensions require separate review. Their absence from the top-level
+  selector policy is not evidence that every such path is exploitable; compatibility and
+  authorization semantics must be assessed per token.
 - **Non-standard token behaviour.** Fee-on-transfer, rebasing, and tokens that do not return
   a single `true` word remain outside the guarantee. v1 refuses the last category rather than
   tolerating it.

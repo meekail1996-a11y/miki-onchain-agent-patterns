@@ -134,9 +134,10 @@ ERC-20 `transfer` issued by the executor to a token the admin registered with
   is made, so the guarantee is about the amounts the executor declared, not about the balance
   change that results. Fee-on-transfer and rebasing tokens are outside it, and a token whose
   return value is not a single `true` word is refused rather than tolerated.
-- **The refused selectors** are `approve`, `increaseAllowance` and `transferFrom`, on any
-  target. This is what keeps the metered path from creating or spending an allowance, and it
-  is why the allowance route below is a documented prerequisite rather than a control.
+- **The refused selectors** are `approve`, `increaseAllowance` and `transferFrom`,
+  when they are the top-level selectors of an Intent passed through `execute`, on any target.
+  This does not constitute a general ban on token-specific authorization mechanisms or
+  indirect calls that may move tokens.
 - **The movements outside this path** are bounded by neither cap: an allowance that already
   existed when the policy was first relied on, and a target that pulls with `transferFrom`
   inside the executed call. `test_PreExistingAllowanceIsPulledWithoutAnyExecution` and
@@ -146,11 +147,12 @@ Two details that follow from the design rather than from taste:
 
 - **The cap is per token, shared across Intents, and not per target.** Two transfers in the
   same day draw on one budget, because the token is the unit of exposure, not the call.
-- **A zero cap stops a token.** `setTokenCap(token, 0)` is the stop switch, and it stays
-  available after the token has spent today. A positive cap below today's spend is refused
-  (`TokenCapBelowSpent`), which is what keeps `tokenSpentToday <= tokenCapPerDay` true for
-  every non-zero cap and lets `invariant_TokenSpendNeverExceedsCap` state the property
-  without a carve-out.
+- **A zero cap stops the metered direct-transfer path for that token.**
+  `setTokenCap(token, 0)` does not revoke existing allowances or prevent token movements
+  through paths outside this mechanism. It stays available after the token has spent today.
+  A positive cap below today's spend is refused (`TokenCapBelowSpent`), which is what keeps
+  `tokenSpentToday <= tokenCapPerDay` true for every non-zero cap and lets
+  `invariant_TokenSpendNeverExceedsCap` state the property without a carve-out.
 
 The registry is append-only: `addMeteredToken` adds and there is no removal function, so a
 token cannot be quietly dropped from the set a reviewer is reading. Stopping a token is a
