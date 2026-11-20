@@ -1,9 +1,10 @@
 # Evidence map: claim → test → command
 
-Every row in this file is machine-checkable: the claim, the exact test that pins it, and the
-command that reproduces it. Nothing here is asserted without a test name, and the
-documentation guard fails the build if a test named in this repository's documentation stops
-existing (`scripts/check_doc_claims.py`, run in CI as the `docs-claims` job).
+The claims in this file are linked to named tests and reproducible commands. The
+documentation guard checks that referenced test names and documented suite/count
+claims match the repository (`scripts/check_doc_claims.py`, run in CI as the
+`docs-claims` job). It does not independently verify the semantic accuracy of
+each security claim or prove that a test is sufficient.
 
 Purpose for readers of a grant application: a reviewer should not have to trust prose. Pick
 a row, run the command, see the pass.
@@ -108,7 +109,7 @@ the documentation guard (in both of its modes).
 | Nothing executes while paused | `invariant_NoExecutionWhilePaused` (`test/Pattern2Invariant.t.sol`) | `forge test --match-test invariant_NoExecutionWhilePaused` |
 | The nonce advances exactly once per successful execution | `invariant_NonceMatchesExecutions` (`test/Pattern2Invariant.t.sol`) | `forge test --match-test invariant_NonceMatchesExecutions` |
 | Balance and recorded outflow agree, and the target received it | `invariant_BalanceMatchesOutflow` (`test/Pattern2Invariant.t.sol`) | `forge test --match-test invariant_BalanceMatchesOutflow` |
-
+| For a registered token with a non-zero cap, recorded daily token spend never exceeds the cap in force | `invariant_TokenSpendNeverExceedsCap` (`test/Pattern2Invariant.t.sol`) | `forge test --match-test invariant_TokenSpendNeverExceedsCap` |
 Each invariant runs over 256 runs and 128,000 handler calls with allowlisted and
 non-allowlisted executions, cap changes, day jumps and pause/resume all active.
 
@@ -125,7 +126,10 @@ non-allowlisted executions, cap changes, day jumps and pause/resume all active.
 
 | Gap | Pinned by | Reproduce |
 |---|---|---|
-| A registered token's direct `transfer` is bounded by its own daily cap; movement outside that path (a pre-existing allowance, a target that pulls with `transferFrom`) bypasses both caps | `test_TokenTransfersAreBoundedByTheirOwnCap` (`test/SecurityReview.t.sol`) | `forge test --match-test test_TokenTransfersAreBoundedByTheirOwnCap` |
+| A registered token's direct `transfer` is bounded by its own daily cap and declared amount | `test_TokenTransfersAreBoundedByTheirOwnCap` (`test/SecurityReview.t.sol`) | `forge test --match-test test_TokenTransfersAreBoundedByTheirOwnCap` |
+| A pre-existing allowance can be used to pull tokens without an Intent, nonce change, or spending-cap charge | `test_PreExistingAllowanceIsPulledWithoutAnyExecution` (`test/SecurityReview.t.sol`) | `forge test --match-test test_PreExistingAllowanceIsPulledWithoutAnyExecution` |
+| An approved target can pull tokens through `transferFrom` during execution without a per-token cap charge | `test_IndirectPullDuringExecutionIsNotCharged` (`test/SecurityReview.t.sol`) | `forge test --match-test test_IndirectPullDuringExecutionIsNotCharged` |
+| A round-trip transfer can move 100 tokens out and return 90, leaving a net loss of 10 without a per-token cap charge | `test_OutAndBackLeavesTenUnitLossWithinOneExecution` (`test/SecurityReview.t.sol`) | `forge test --match-test test_OutAndBackLeavesTenUnitLossWithinOneExecution` |
 | Malleable signatures would be accepted without the `ECDSA` library's high-`s` rejection | `test_RejectsMalleableHighSSignature` (`test/SecurityReview.t.sol`) | `forge test --match-test test_RejectsMalleableHighSSignature` |
 
 ## Documentation integrity
@@ -141,7 +145,9 @@ non-allowlisted executions, cap changes, day jumps and pause/resume all active.
 - It does not turn any of this into an audit. Every row is a test written by the same author
   as the code, and that is exactly the gap milestone M1 of the grant is meant to close.
 - It does not prove liveness or accounting. Removing `dailySpent += intent.value` or the day
-  reset leaves the four invariants green; those behaviours are pinned by the unit and fuzz
+  reset leaves the five invariants green; those behaviours are pinned by the unit and fuzz
   suites above, not by the invariants.
-- It does not cover ERC-20 value, key rotation, upgradeability or operational security: none
-  of those are implemented, and the roadmap in the README lists them as planned work.
+- The per-token control covers only direct `transfer` calls for registered tokens and
+  charges the declared amount. It does not account for pre-existing allowances,
+  indirect `transferFrom` calls, or gross out-and-back token movement. Key rotation,
+  upgradeability and broader operational security are also outside this implementation.

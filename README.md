@@ -208,7 +208,7 @@ If these checks pass, spending is recorded before the external call and executio
 
 **What this adds:** Destination restrictions, daily native-currency spending limits, and emergency stop/resume controls.
 
-**Remaining risk:** The cap tracks `intent.value`; it does not account for ERC-20 transfers or other token exposure. The allowlist also does not establish that every function or calldata sent to an approved target is safe.
+**Remaining risk:** The native cap tracks `intent.value`. A separate per-token cap bounds direct `transfer` calls for registered tokens by their declared amount. Neither cap covers token movement through pre-existing allowances or indirect `transferFrom` calls by approved targets. The allowlist also does not establish that every function or calldata sent to an approved target is safe.
 
 ### Pattern 3 — Multi-Agent Arbitration
 
@@ -239,7 +239,7 @@ This scenario illustrates three distinct security boundaries:
 | Pattern | Main protection | Important limitation |
 |---|---|---|
 | Pattern 1 | Signed authorization and replay protection | No target allowlist or spending cap |
-| Pattern 2 | Allowlist and daily native-currency cap | Centralized admin; no ERC-20 cap |
+| Pattern 2 | Allowlist, daily native-currency cap, and per-token cap for direct transfers | Centralized admin; pre-existing allowances and indirect `transferFrom` calls are outside the token cap |
 | Pattern 3 | Agent voting and quorum-based approval | Centralized arbiter; no target allowlist or spending cap |
 
 The patterns are educational reference designs, not interchangeable production-ready payment systems.
