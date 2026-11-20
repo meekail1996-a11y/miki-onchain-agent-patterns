@@ -60,6 +60,8 @@ so this table cannot quietly rot.
 | Day reset and midnight straddle | `test_DayResetDoesNotAccumulateAcrossIdleDays`, `test_BoundaryStraddleAllowsTwoCapsCloseTogether` | `test/SecurityReview.t.sol` |
 | ERC-20 transfers bounded by the token's own daily cap | `test_TokenTransfersAreBoundedByTheirOwnCap` | `test/SecurityReview.t.sol` |
 | `approve` refused on the metered path | `test_ApproveOnMeteredTokenReverts` | `test/TokenControls.t.sol` |
+| Invalid permit signature claiming the executor as owner is rejected (standard OpenZeppelin ERC20Permit) | `test_PermitCannotBeSignedForExecutorContract` | `test/SecurityReview.t.sol` |
+| A valid permit signed by an EOA authorizes that EOA's tokens, not the executor's | `test_PermitThroughExecutorOnlyAuthorizesEOBOwnedTokens` | `test/SecurityReview.t.sol` |
 | A token that was never registered is refused | `test_TransferOfUnregisteredTokenReverts` | `test/TokenControls.t.sol` |
 | An over-cap token transfer leaves no trace | `test_OverCapTokenTransferRevertsAndRollsBack` | `test/TokenControls.t.sol` |
 | Direct execution disabled in Pattern 3 | `test_RevertWhenDirectExecutionIsAttempted` | `test/Pattern3.t.sol` |
@@ -138,6 +140,15 @@ ERC-20 `transfer` issued by the executor to a token the admin registered with
   when they are the top-level selectors of an Intent passed through `execute`, on any target.
   This does not constitute a general ban on token-specific authorization mechanisms or
   indirect calls that may move tokens.
+
+- **ERC-2612 `permit` is not blocked.** An allowlisted token's `permit` function can
+  therefore be called through the normal execution path. With standard OpenZeppelin
+  ERC20Permit, the signature must recover the declared token owner: an agent's ECDSA
+  signature cannot authorize the executor contract's balance by claiming the executor
+  as owner. A valid permit for an EOA owner authorizes that EOA's tokens, not the
+  executor's balance. These tests cover standard OpenZeppelin ERC20Permit only;
+  alternative permit implementations and contract-account authorization schemes
+  require separate review.
 - **The movements outside this path** are bounded by neither cap: an allowance that already
   existed when the policy was first relied on, and a target that pulls with `transferFrom`
   inside the executed call. `test_PreExistingAllowanceIsPulledWithoutAnyExecution` and
@@ -245,7 +256,7 @@ Slither 0.11.6 was run against the three contracts (forge 1.9.0, solc 0.8.38 as 
 
 ### Test Coverage
 
-`forge coverage` over the current 110-test suite reports **100% of lines** (187/187), 97.58% of statements (202/207), 90.74% of branches (49/54) and 100% of functions across the three contracts, measured with `forge coverage --report summary --no-match-coverage "(test|script)/"` on the pinned solc 0.8.38. Every line of every contract is executed by at least one test.
+`forge coverage` over the 110-test coverage snapshot reports **100% of lines** (187/187), 97.58% of statements (202/207), 90.74% of branches (49/54) and 100% of functions across the three contracts, measured with `forge coverage --report summary --no-match-coverage "(test|script)/"` on the pinned solc 0.8.38. Every line of every contract is executed by at least one test.
 
 The remaining gaps are statements and branches in `Pattern3_MultiAgentArbitration` (92.96% of statements, 79.17% of branches): `Pattern1_PlannerExecutor` and `Pattern2_BoundedAutonomy` are fully covered on every metric. An uncovered branch is not automatically a defect — some are unreachable defensive reverts — but a reviewer should read those paths rather than assume they are exercised. Coverage is a coverage metric, not a security guarantee.
 
@@ -307,7 +318,7 @@ This repository is an educational and experimental project.
 - It has not undergone an independent professional security audit.
 - It is not production-ready.
 - `test/SecurityReview.t.sol` pins the guarantees that are easy to regress: rejection of malleable (high-`s`) signatures, rejection of signatures bound to another chain, the inclusive deadline boundary, release of a nonce reserved by a proposal that expired before resolution, the arbiter-dependent liveness of a squatted nonce, blocked votes from removed agents, a registered token's direct transfer staying inside its
-own cap, and token movement outside that path escaping both caps.
+own cap, and token movement outside that path escaping both caps. The two ERC-2612 tests also pin standard OpenZeppelin ERC20Permit behavior for executor-owned and EOA-owned tokens.
 - Passing automated tests does not guarantee the absence of vulnerabilities.
 - The documented controls reduce specific risks but do not eliminate all smart contract, key-management, operational, or integration risks.
 

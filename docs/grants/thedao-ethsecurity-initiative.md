@@ -45,7 +45,7 @@ author can build, not a shipped capability.
 | Component | State |
 |---|---|
 | Three reference contracts (planner/executor, bounded autonomy, multi-agent arbitration) | Merged, `v0.1.8` |
-| Solidity suite | 110 tests in 9 suites, green locally and in CI (`Tests` on `9279a12`) |
+| Solidity suite | 112 tests in 9 suites, green locally (`bash scripts/verify_all.sh`); CI status for the latest additions not yet confirmed |
 | Metered ERC-20 transfer path (M3 v1) | Merged to `main`; 23 of the suite's tests cover it |
 | Sequence-level invariants | 5 invariants, 256 runs, 128,000 handler calls, every handler action succeeding (measured locally) |
 | Python EIP-712 signer and digest-parity tests | 7 tests, green in CI |
@@ -246,7 +246,7 @@ From a fresh clone, no keys, no deployment:
 
 ```bash
 git submodule update --init --recursive
-forge test                                   # 110 tests, 9 suites
+forge test                                   # 112 tests, 9 suites
 python -m unittest discover -s tests -v      # 7 tests
 bash scripts/verify_all.sh                   # all four CI checks locally
 ```
@@ -254,7 +254,7 @@ bash scripts/verify_all.sh                   # all four CI checks locally
 Expected tail of the Solidity run:
 
 ```text
-Ran 9 test suites in 29.13s (29.66s CPU time): 110 tests passed, 0 failed, 0 skipped (110 total tests)
+Ran 9 test suites in 64.83s (65.93s CPU time): 112 tests passed, 0 failed, 0 skipped (112 total tests)
 ```
 
 The repository's documentation guard is part of CI: a README that quotes a stale test count,
@@ -278,7 +278,7 @@ TODO: full name, location, and jurisdiction eligibility. A solo applicant is acc
 this size of ask; the point below is what has been shipped.
 
 - GitHub: [@beshavard_eth](https://github.com/meekail1996-a11y) — owner and sole author of
-  this repository: three contracts, 110 Solidity tests, the Python signer, both CI workflows,
+  this repository: three contracts, 112 Solidity tests, the Python signer, both CI workflows,
   and the documentation set.
 - Twelve years running a school. Relevant as evidence of long-horizon delivery and
   documentation discipline, **not** as security experience — remove this line if you would

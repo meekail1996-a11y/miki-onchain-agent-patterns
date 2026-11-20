@@ -353,7 +353,7 @@ no deployment are required; only the first dependency install needs network acce
 
 ```bash
 git submodule update --init --recursive
-forge test                                   # 110 Solidity tests
+forge test                                   # 112 Solidity tests
 python -m pip install -r requirements.txt    # first run only
 python -m unittest discover -s tests -v      # 7 Python tests
 ```
@@ -361,7 +361,7 @@ python -m unittest discover -s tests -v      # 7 Python tests
 Expected tail of the Solidity run:
 
 ```text
-Ran 9 test suites in 29.13s (29.66s CPU time): 110 tests passed, 0 failed, 0 skipped (110 total tests)
+Ran 9 test suites in 64.95s (65.62s CPU time): 112 tests passed, 0 failed, 0 skipped (112 total tests)
 ```
 
 Expected tail of the Python run:
@@ -377,7 +377,7 @@ What each suite is worth running for:
 | Command | What it pins |
 |---|---|
 | `forge test` | all three patterns, quorum, nonce and reentrancy behaviour |
-| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, the ERC-20 transfer bound, the refused `approve`, a pre-existing allowance, an indirect pull through an allowlisted target, net-versus-gross outflow, the absent ERC-1271, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle) |
+| `forge test --match-path test/SecurityReview.t.sol` | malleable (high-`s`) signatures, cross-chain replay, the inclusive deadline, expired proposals, nonce squatting, removed-agent voting, the ERC-20 transfer bound, the refused `approve`, a pre-existing allowance, an indirect pull through an allowlisted target, net-versus-gross outflow, the absent ERC-1271, quorum with a dissenting vote, queued future nonces, replay after execution, and the daily-cap day boundary (one second before, exact reset, idle days, midnight straddle), standard ERC-2612 permit behavior (executor-owned versus EOA-owned tokens) |
 | `forge test --match-path test/TokenControls.t.sol` | the metered-token path: `approve`, `increaseAllowance` and `transferFrom` refused on a registered token, an unregistered token refused, the declared amount charged to a per-token daily cap, the charge rolled back with the transfer, malformed calldata, the three failing return shapes (`false`, empty, non-boolean), a zero cap stopping a token, a cap that survives target removal, and the duplicated deadline and nonce rules |
 | `forge test --match-path test/Pattern2Fuzz.t.sol` | daily spending-cap accounting under random inputs (256 runs per property) |
 | `forge test --match-path test/Pattern2Invariant.t.sol` | sequence-level invariants over random days, values, cap changes, pause/resume and token transfers: no execution leaves the recorded spend above the cap in force at that moment, none succeeds while paused, the nonce advances once per successful execution, the balance matches the outflow the target actually received, and today's token spend never exceeds a non-zero token cap (256 runs, 128k calls) |
@@ -460,7 +460,7 @@ Five targeted mutations were applied to `contracts/Pattern2_BoundedAutonomy.sol`
 - **M3** showed that the charge line *is* the token bound: with it gone, eight tests failed, including the shared-budget case, the moved-token cases and the recorded event, and none of the revert assertions caught it — they only bound a single call.
 - **M4** left exactly one failure, `test_MalformedTokenCallReverts`. That is the only test pinning the length rule, which is the right shape: one line, one assertion.
 - **M5** left two failures, the `false` and non-boolean returns. The empty-return case still failed on the length check, so it is pinned by a different line and the two mutations are independent.
-- After each mutation the original file was restored, its checksum matched the pre-mutation copy, and the full suite passed again (110 tests, 0 failures).
+- After each mutation the original file was restored, its checksum matched the pre-mutation copy, and the then-current suite (110 tests at that time) passed with no failures.
 
 These are five targeted mutations, not a mutation-testing campaign. They show that these lines are covered by tests; they do not show that every reachable defect would be caught.
 

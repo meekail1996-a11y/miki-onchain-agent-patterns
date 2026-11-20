@@ -6,6 +6,8 @@ import "../contracts/Pattern1_PlannerExecutor.sol";
 import "../contracts/Pattern2_BoundedAutonomy.sol";
 import "../contracts/Pattern3_MultiAgentArbitration.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 contract ReviewReceiver {
     uint256 public calls;
@@ -17,6 +19,14 @@ contract ReviewReceiver {
 
 contract MockToken is ERC20 {
     constructor() ERC20("Mock", "MCK") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
+
+contract PermitMockToken is ERC20, ERC20Permit {
+    constructor() ERC20("Permit Mock", "PMCK") ERC20Permit("Permit Mock") {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -1207,4 +1217,129 @@ contract SecurityReviewTest is Test {
         assertFalse(ok, "isValidSignature(bytes32,bytes) must not be answered");
         assertEq(returndata.length, 0, "and nothing is returned for it");
     }
+
+    // ------------------------------------------------------- ERC-2612 permit checks
+
+    function _permitSignature(
+        PermitMockToken token,
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint256 ownerKey
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        bytes32 permitTypehash = keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                permitTypehash,
+                owner,
+                spender,
+                value,
+                token.nonces(owner),
+                deadline
+            )
+        );
+
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
+
+        return vm.sign(ownerKey, digest);
+    }
+
+    /// Standard OpenZeppelin ERC20Permit uses ECDSA recovery.
+    /// A signature from the agent cannot impersonate the executor contract as token owner.
+    function test_PermitCannotBeSignedForExecutorContract() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+        PermitMockToken token = new PermitMockToken();
+
+        address spender = makeAddr("permit-spender");
+        uint256 deadline = block.timestamp + 1 hours;
+        uint256 amount = 100e18;
+
+        token.mint(address(bounded), amount);
+
+        (uint8 v, bytes32 r, bytes32 s) = _permitSignature(
+            token,
+            address(bounded),
+            spender,
+            amount,
+            deadline,
+            signerKey
+        );
+
+        bounded.addTarget(address(token));
+
+        bytes memory permitData = abi.encodeCall(
+            IERC20Permit.permit,
+            (address(bounded), spender, amount, deadline, v, r, s)
+        );
+
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(token),
+            0,
+            permitData,
+            0,
+            deadline
+        );
+
+        vm.expectRevert(Pattern1_PlannerExecutor.CallFailed.selector);
+        bounded.execute(intent, _sign(address(bounded), intent));
+
+        assertEq(token.allowance(address(bounded), spender), 0);
+    }
+
+    /// The permit selector is not blocked by Pattern2 and can execute for an EOA owner.
+    /// The resulting allowance belongs to that EOA, not to the executor's token balance.
+    function test_PermitThroughExecutorOnlyAuthorizesEOBOwnedTokens() public {
+        Pattern2_BoundedAutonomy bounded = new Pattern2_BoundedAutonomy(signer, 1 ether);
+        PermitMockToken token = new PermitMockToken();
+
+        address spender = makeAddr("permit-spender");
+        uint256 amount = 100e18;
+        uint256 executorBalance = 500e18;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        token.mint(signer, amount);
+        token.mint(address(bounded), executorBalance);
+        bounded.addTarget(address(token));
+
+        (uint8 v, bytes32 r, bytes32 s) = _permitSignature(
+            token,
+            signer,
+            spender,
+            amount,
+            deadline,
+            signerKey
+        );
+
+        bytes memory permitData = abi.encodeCall(
+            IERC20Permit.permit,
+            (signer, spender, amount, deadline, v, r, s)
+        );
+
+        Pattern1_PlannerExecutor.Intent memory intent = _intent(
+            address(token),
+            0,
+            permitData,
+            0,
+            deadline
+        );
+
+        bounded.execute(intent, _sign(address(bounded), intent));
+
+        assertEq(token.allowance(signer, spender), amount);
+        assertEq(token.allowance(address(bounded), spender), 0);
+
+        vm.prank(spender);
+        token.transferFrom(signer, spender, amount);
+
+        assertEq(token.balanceOf(spender), amount);
+        assertEq(token.balanceOf(signer), 0);
+        assertEq(token.balanceOf(address(bounded)), executorBalance);
+    }
+
 }
